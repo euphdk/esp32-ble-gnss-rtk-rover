@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "ble_uart.h"
 #include "nmea.h"
 #include "rtcm.h"
 
@@ -22,6 +23,35 @@ struct ShortWriter {
 };
 
 int main() {
+  BleUartBatch batch;
+  std::string bleOutput;
+  std::vector<size_t> notificationSizes;
+  auto notify = [&](const uint8_t* data, size_t length) {
+    assert(length > 0 && length <= BleUartBatch::kPayloadSize);
+    bleOutput.append(reinterpret_cast<const char*>(data), length);
+    notificationSizes.push_back(length);
+  };
+  batch.flush(notify);
+  assert(notificationSizes.empty());
+  // Put CR and LF on opposite sides of a notification boundary.
+  const std::string stream = std::string(19, 'X') + "\r\n$GNRMC,test\r\n";
+  for (char byte : stream) batch.append(static_cast<uint8_t>(byte), notify);
+  assert(notificationSizes == std::vector<size_t>({20}));
+  batch.flush(notify);
+  assert(bleOutput == stream);
+  assert(notificationSizes == std::vector<size_t>({20, stream.size() - 20}));
+  batch.flush(notify);
+  assert(notificationSizes.size() == 2);
+  for (size_t i = 0; i < 40; ++i) batch.append('A', notify);
+  batch.flush(notify);
+  assert(notificationSizes == std::vector<size_t>({20, stream.size() - 20, 20, 20}));
+  assert(bleOutput == stream + std::string(40, 'A'));
+  batch.append('X', notify);
+  batch.clear();
+  batch.append('Y', notify);
+  batch.flush(notify);
+  assert(bleOutput == stream + std::string(40, 'A') + 'Y');
+
   const uint8_t binary[] = {0xd3, 0x00, 0x13, 0x00, 0xff, 0x80};
   ShortWriter writer;
   assert(forwardRtcm(binary, sizeof(binary), writer));

@@ -2,7 +2,7 @@
 
 This Arduino prototype connects an ESP32-S3 N16R8 development board to a u-blox ZED-F9P GNSS receiver. It uses BLE only, without Bluetooth Classic.
 
-The BLE RX characteristic accepts correction bytes for the receiver. The BLE TX characteristic provides GNSS NMEA bytes and periodic status.
+The BLE RX characteristic accepts correction bytes for the receiver. The BLE TX characteristic provides only receiver UART bytes. Status output uses the serial console.
 
 ## Receiver board
 
@@ -41,10 +41,10 @@ The photo shows an SMA antenna connector at the bottom and a small coaxial conne
 
 The firmware does not configure the receiver. Configure it through the receiver board's USB connection with u-blox u-center or another compatible configuration tool.
 
-Factory UART1 settings are normally **38400 baud, 8N1**, with NMEA output and RTCM 3 input enabled. A seller or previous owner can change these settings. This firmware expects **115200 baud, 8N1** by default.
+Factory UART1 settings are normally **38400 baud, 8N1**, with NMEA output and RTCM 3 input enabled. A seller or previous owner can change these settings. This firmware expects **38400 baud, 8N1** by default.
 
 1. Connect to the receiver through USB and read its firmware version and current configuration.
-2. Set receiver UART1 to 115200 baud, 8 data bits, no parity, and one stop bit.
+2. Set receiver UART1 to 38400 baud, 8 data bits, no parity, and one stop bit.
 3. Enable RTCM 3 input on UART1 (`CFG-UART1INPROT-RTCM3X`).
 4. Enable NMEA output on UART1 (`CFG-UART1OUTPROT-NMEA`).
 5. Enable GGA and RMC messages on UART1 in the message-output settings.
@@ -54,7 +54,7 @@ Factory UART1 settings are normally **38400 baud, 8N1**, with NMEA output and RT
 9. Save the configuration to supported persistent storage, not only RAM.
 10. Restart the receiver and verify that the settings persist.
 
-Configuration names and tool menus depend on the receiver firmware. If you keep UART1 at 38400 baud, change `kGnssBaud` in `include/config.h` to match. Pin constants are in the same file.
+Configuration names and tool menus depend on the receiver firmware. If you change the receiver's UART1 baud rate, change `kGnssBaud` in `include/config.h` to match. Pin constants are in the same file. The serial console remains at 115200 baud.
 
 UART2 normally serves correction traffic and does not output NMEA by default. Connecting this bridge to `TX2`/`RX2` without receiver configuration will not provide the expected NMEA stream.
 
@@ -82,14 +82,47 @@ The monitor shows startup diagnostics, including the free-heap measurement at bo
 sh test/host/run.sh
 ```
 
-The project pins PlatformIO's Espressif32 platform to `~8.0.0`; BLE uses the Arduino ESP32 core's bundled `BLEDevice` GATT API. Host tests cover NMEA checksum/fix parsing and binary RTCM byte-preserving forwarding, including short writes. The host tests do not compile or emulate the ESP32 BLE stack.
+The project pins PlatformIO's Espressif32 platform to `~8.0.0`; BLE uses the Arduino ESP32 core's bundled `BLEDevice` GATT API. Host tests cover NMEA checksum/fix parsing, BLE UART batching, and binary RTCM byte-preserving forwarding, including short writes. The host tests do not compile or emulate the ESP32 BLE stack.
+
+## Serial diagnostics
+
+Serial diagnostics are enabled by default through `kSerialDebug` in `include/config.h`.
+
+1. Upload the firmware with `pio run -e esp32-s3 -t upload`.
+2. Open `pio device monitor -b 115200` on the ESP32's USB-to-UART port.
+3. Press the ESP32 reset button to see the startup baud rate and GPIO assignments.
+4. Connect SW Maps and capture several seconds of console output.
+
+Each second, the console shows BLE connection state, GGA fix quality, sentence counts, checksum errors, and correction bytes. Additional fields show:
+
+| Field | Meaning |
+| --- | --- |
+| `gnss_rx_bytes` | Total bytes read from the receiver UART since boot |
+| `nmea` | Total complete NMEA sentences with valid checksums |
+| `ble_nmea_notify_calls` | NMEA chunk notification attempts, not byte counts, confirmed delivery, or client subscription |
+| `last_rx_age_ms` | Time since the last UART byte |
+| `sample_bytes` | Bytes captured for this sample, up to 64 per reporting interval |
+
+`[gnss hex]` shows the sample as hexadecimal bytes. `[gnss text]` shows the same bytes, with dots for nonprintable bytes. Samples are partial data, not necessarily complete sentences. The console does not echo the full UART stream.
+
+- If `gnss_rx_bytes` stays zero, check receiver power, shared ground, and `TX1` to GPIO16 wiring.
+- If bytes arrive without valid NMEA, compare the receiver's UART1 baud rate with the startup log.
+- If the text sample is unreadable, check baud rate and signal levels. Binary UBX output can also produce unreadable text.
+- If `nmea` increases but `gga` stays zero, enable GGA output on receiver UART1.
+- If `gga` increases with `fix=0`, check the antenna and sky view.
+- If valid NMEA and notification attempts increase, check SW Maps' TX characteristic subscription and BLE compatibility.
+- If `last_rx_age_ms` increases continuously, the receiver stream has stopped. The displayed fix value can be stale.
+
+Set `kSerialDebug` to `false` and rebuild to disable periodic console diagnostics. The startup free-heap message remains enabled. Diagnostics do not change the BLE payload format or prove that SW Maps accepts it.
 
 ## GATT protocol
 
 Service UUID: `6e400001-b5a3-f393-e0a9-e50e24dcca9e` (Nordic-UART-style UUIDs).
 
 * RX `6e400002-b5a3-f393-e0a9-e50e24dcca9e`: write or write-without-response. Each write payload is forwarded unchanged to GNSS UART; payloads are treated as opaque binary (not UTF-8 or NMEA).
-* TX `6e400003-b5a3-f393-e0a9-e50e24dcca9e`: notifications/read. NMEA is notified as individual bytes. Once per second the characteristic is set to a text status line: BLE connection state, GGA fix quality, GGA count, checksum errors, and forwarded RTCM bytes. A status update replaces the most recent TX value. This prototype is for evaluation, not a framed or lossless telemetry protocol.
+* TX `6e400003-b5a3-f393-e0a9-e50e24dcca9e`: notifications/read. Receiver UART bytes use chunks of up to 20 bytes, compatible with the default ATT MTU of 23 bytes. Full chunks send immediately. After each UART drain, a partial chunk sends if at least 20 ms have elapsed since the previous notification. Concatenate notifications to reconstruct the stream, including original CR/LF sentence endings. A notification can contain part of a sentence or cross a sentence boundary. Reads return the latest chunk, not a complete sentence or history. No diagnostic status text is inserted into this stream.
+
+Configure receiver UART1 output for NMEA only. The bridge does not filter binary output or change talker IDs. It does not replay bytes received while disconnected or guarantee notification delivery. Batching reduces notification overhead, but SW Maps interoperability still requires a hardware check.
 
 ## SW Maps setup checklist
 
