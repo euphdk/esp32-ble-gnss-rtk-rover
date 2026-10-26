@@ -1,20 +1,86 @@
 # ESP32 BLE GNSS RTK rover prototype
 
-This firmware is a non-blocking Arduino prototype for an ESP32 DevKit and a UART GNSS receiver. It exposes a BLE GATT UART-style service: write correction bytes to the RX characteristic and read/subscribe to the TX characteristic for GNSS NMEA bytes and periodic status. It uses BLE only; Bluetooth Classic is not enabled.
+This Arduino prototype connects an ESP32-S3 N16R8 development board to a u-blox ZED-F9P GNSS receiver. It uses BLE only, without Bluetooth Classic.
+
+The BLE RX characteristic accepts correction bytes for the receiver. The BLE TX characteristic provides GNSS NMEA bytes and periodic status.
+
+## Receiver board
+
+The supplied photo shows a ZED-F9P-01B-01 module on a board marked `URTK1.2`.
+
+![ZED-F9P receiver board and connector labels](IMG_0169.jpg)
+
+Use the white six-pin connector labeled `GND`, `NC`, `NC`, `TX1`, `RX1`, and `5V`. These labels identify the receiver's UART1 connection. The side header also exposes `TX2` and `RX2` for UART2. This setup does not use UART2.
 
 ## Wiring
 
-| ESP32 | GNSS receiver |
-| --- | --- |
-| GPIO16 (RX2) | GNSS TX |
-| GPIO17 (TX2) | GNSS RX |
-| GND | GND |
+Disconnect power before connecting wires. Identify each contact by its board label, not by cable color.
 
-Use compatible logic levels and power for the specific receiver. Configure `kGnssBaud` and pin constants in `include/config.h` to match the hardware. The default is 115200 baud. UART2 is dedicated to the receiver; USB serial is diagnostic output.
+| ESP32-S3 | ZED-F9P board, white six-pin connector |
+| --- | --- |
+| GPIO16 (GNSS RX) | TX1 |
+| GPIO17 (GNSS TX) | RX1 |
+| GND | GND |
+| No connection | NC, NC |
+
+Connect TX to RX in each direction. The firmware uses ESP32 hardware UART1, with RX on GPIO16 and TX on GPIO17. ESP32 UART numbering is independent of the receiver's UART numbering. USB serial carries diagnostic output.
+
+### Power and antenna
+
+- UART signals must use 3.3 V logic. Never connect 5 V to an ESP32 GPIO or a receiver UART pin.
+- The connector's `5V` label refers to board power, not UART voltage. The bare ZED-F9P module requires a regulated supply below 5 V.
+- Confirm the carrier board's input rating and regulator arrangement with the seller before supplying power through its `5V` pin.
+- Alternatively, power the receiver board through its USB-C connector with an appropriate USB supply.
+- Connect the ESP32 and receiver grounds even when each board has a separate supply.
+- Do not connect multiple receiver power inputs together without confirming the board's power-path design.
+- Connect a suitable multiband GNSS antenna to the board's antenna input. Confirm active-antenna voltage and current requirements with the board supplier.
+
+The photo shows an SMA antenna connector at the bottom and a small coaxial connector labeled `J4`. Their routing and antenna-bias circuitry require the carrier schematic. Do not assume both connectors support simultaneous use.
+
+## ZED-F9P receiver setup
+
+The firmware does not configure the receiver. Configure it through the receiver board's USB connection with u-blox u-center or another compatible configuration tool.
+
+Factory UART1 settings are normally **38400 baud, 8N1**, with NMEA output and RTCM 3 input enabled. A seller or previous owner can change these settings. This firmware expects **115200 baud, 8N1** by default.
+
+1. Connect to the receiver through USB and read its firmware version and current configuration.
+2. Set receiver UART1 to 115200 baud, 8 data bits, no parity, and one stop bit.
+3. Enable RTCM 3 input on UART1 (`CFG-UART1INPROT-RTCM3X`).
+4. Enable NMEA output on UART1 (`CFG-UART1OUTPROT-NMEA`).
+5. Enable GGA and RMC messages on UART1 in the message-output settings.
+6. Disable periodic UBX and RTCM output on UART1 to keep the rover's output stream NMEA-only.
+7. Disable time mode (`CFG-TMODE-MODE = 0`) for rover use. Do not enable base-station survey-in or fixed-position mode.
+8. Start with a 1 Hz navigation rate and a small NMEA message set to limit BLE traffic.
+9. Save the configuration to supported persistent storage, not only RAM.
+10. Restart the receiver and verify that the settings persist.
+
+Configuration names and tool menus depend on the receiver firmware. If you keep UART1 at 38400 baud, change `kGnssBaud` in `include/config.h` to match. Pin constants are in the same file.
+
+UART2 normally serves correction traffic and does not output NMEA by default. Connecting this bridge to `TX2`/`RX2` without receiver configuration will not provide the expected NMEA stream.
+
+For RTK, supply compatible RTCM 3 corrections from an NTRIP service or base station. The correction stream must cover the constellations and signals used by the receiver. The ZED-F9P computes the RTK solution, not the ESP32.
+
+For higher position precision in NMEA, consider `CFG-NMEA-HIGHPREC` after checking the client application's support. The status parser discards sentences longer than 127 characters. Raw UART bytes still pass to BLE.
+
+References: [ZED-F9P-01B data sheet](https://content.u-blox.com/sites/default/files/documents/ZED-F9P-01B_DataSheet_UBX-17051259.pdf) and [ZED-F9P integration manual](https://content.u-blox.com/sites/default/files/ZED-F9P_IntegrationManual_UBX-18010802.pdf). Use the interface description that matches the installed receiver firmware.
 
 ## Build and host tests
 
-Install PlatformIO Core, then run `pio run -e esp32dev` to build and `pio run -e esp32dev -t upload` to upload. `pio device monitor -b 115200` shows startup diagnostics, including the free-heap measurement taken at boot. Run host-only protocol tests with `sh test/host/run.sh`.
+Install PlatformIO Core. The `esp32-s3` environment targets an ESP32-S3 N16R8 board with 16 MB flash and 8 MB octal PSRAM.
+
+```sh
+pio run -e esp32-s3
+pio run -e esp32-s3 -t upload
+pio device monitor -b 115200
+```
+
+Use the ESP32 board's USB-to-UART connector for upload and diagnostic output. If multiple serial devices appear, select the ESP32 port with `--upload-port` or the monitor's `--port` option. The receiver's USB port is separate.
+
+The monitor shows startup diagnostics, including the free-heap measurement at boot. Run host-only protocol tests with:
+
+```sh
+sh test/host/run.sh
+```
 
 The project pins PlatformIO's Espressif32 platform to `~8.0.0`; BLE uses the Arduino ESP32 core's bundled `BLEDevice` GATT API. Host tests cover NMEA checksum/fix parsing and binary RTCM byte-preserving forwarding, including short writes. The host tests do not compile or emulate the ESP32 BLE stack.
 
@@ -34,8 +100,20 @@ Service UUID: `6e400001-b5a3-f393-e0a9-e50e24dcca9e` (Nordic-UART-style UUIDs).
 
 The GATT service layout is implemented in source, but SW Maps interoperability and its ability to select the two characteristics have not been verified on hardware. Some app flows expect a standard BLE GNSS profile rather than a generic UART service.
 
-## LC29H limitations and verification
+## Receiver checks and limitations
 
-The LC29H's exact UART defaults, supported NMEA sentences, correction protocol/configuration, and RTK fix reporting depend on module firmware and configuration. Check the module documentation and configure baud/protocol accordingly. This firmware forwards arbitrary correction payloads but does not validate RTCM framing, configure the receiver, or guarantee RTK operation.
+Check the following with a BLE client and the receiver's own diagnostics:
 
-Verified in this repository: host protocol tests and source-level BLE/UART implementation. Hardware-dependent and not verified here: PlatformIO target build (unless successful in your environment), BLE connection behavior, notification throughput/fragmentation, LC29H compatibility, SW Maps workflow, RTCM acceptance, and runtime free heap. A boot-time free-heap value is printed to serial; no hardware measurement is available from this implementation environment.
+| Observation | Check |
+| --- | --- |
+| No NMEA data | Receiver power, shared ground, crossed TX/RX wires, UART1 baud rate, and UART1 NMEA message settings |
+| Corrupt NMEA or checksum errors | Baud rate, logic voltage, wiring, and serial signal quality |
+| `gga` increases, but `fix=0` | Antenna connection, sky view, and receiver fix status |
+| Standalone fix, but no RTK | Correction source, RTCM compatibility, correction age, and UART1 RTCM input settings |
+| `rtcm_bytes` increases, but no RTK | Receiver diagnostics for accepted RTCM messages and the resulting solution |
+
+GGA fix quality normally reports `1` for standalone GNSS, `2` for differential GNSS, `4` for RTK fixed, and `5` for RTK float. The firmware reports the last parsed GGA value. It does not detect a stale fix after NMEA stops.
+
+`rtcm_bytes` counts bytes accepted into the ESP32 correction buffer. It does not confirm delivery to the receiver or successful RTCM decoding. The firmware does not validate RTCM framing or guarantee RTK operation.
+
+Verified locally: the ESP32-S3 target build and host protocol tests. Hardware checks remain open for this receiver board, BLE throughput, SW Maps, and RTCM acceptance. Serial output provides the boot-time free-heap value, but no hardware measurement is recorded here.
