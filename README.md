@@ -47,7 +47,7 @@ Factory UART1 settings are normally **38400 baud, 8N1**, with NMEA output and RT
 2. Set receiver UART1 to 38400 baud, 8 data bits, no parity, and one stop bit.
 3. Enable RTCM 3 input on UART1 (`CFG-UART1INPROT-RTCM3X`).
 4. Enable NMEA output on UART1 (`CFG-UART1OUTPROT-NMEA`).
-5. Enable GGA and RMC messages on UART1 in the message-output settings.
+5. Enable GGA and RMC messages on UART1. For SW Maps satellite and accuracy displays, also enable GSA, GSV, and GST.
 6. Disable periodic UBX and RTCM output on UART1 to keep the rover's output stream NMEA-only.
 7. Disable time mode (`CFG-TMODE-MODE = 0`) for rover use. Do not enable base-station survey-in or fixed-position mode.
 8. Start with a 1 Hz navigation rate and a small NMEA message set to limit BLE traffic.
@@ -131,7 +131,28 @@ Configure receiver UART1 output for NMEA only. The bridge does not filter binary
 3. Configure the correction source/NTRIP client in the app and select the RX characteristic as correction output if supported.
 4. Confirm NMEA updates and RTK status on the receiver; compare the receiver's own status output with the firmware status.
 
-The GATT service layout is implemented in source, but SW Maps interoperability and its ability to select the two characteristics have not been verified on hardware. Some app flows expect a standard BLE GNSS profile rather than a generic UART service.
+### Satellite and accuracy displays
+
+[SW Maps documents](https://aviyaantech.com/swmaps/) these NMEA sentence requirements:
+
+| Sentences | SW Maps display |
+| --- | --- |
+| GGA, RMC | Position and time |
+| GSA, GSV | Satellite status and skyplot |
+| GST | Latitude Error, Longitude Error, Horizontal Accuracy, and Vertical Accuracy |
+
+If accuracy fields show `N/A`, check GST output on the receiver's **UART1**. USB output settings are separate.
+
+1. In u-center, set `CFG-MSGOUT-NMEA_ID_GST_UART1` to `1` for output once per navigation cycle.
+2. Save the setting to supported persistent storage.
+3. Verify `$GNGST` or `$GPGST` output on UART1, not only the receiver's USB connection.
+4. Reconnect SW Maps and check the accuracy fields under **GNSS Status**.
+
+The bridge already forwards GST without a firmware change. Its periodic serial samples capture only part of the stream. A missing GST sentence in those samples does not prove that UART1 GST output is absent.
+
+GST values describe receiver-estimated errors, not guaranteed real-world accuracy. A standalone GNSS fix can provide error estimates without RTK corrections.
+
+The user confirmed valid SW Maps positioning with the batched NMEA stream. Accuracy fields, NTRIP corrections, and RTK operation still require hardware checks.
 
 ## Receiver checks and limitations
 
