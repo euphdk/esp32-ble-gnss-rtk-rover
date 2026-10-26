@@ -8,6 +8,7 @@ namespace {
 constexpr size_t kLineCapacity = 128;
 char line[kLineCapacity];
 size_t lineLength = 0;
+bool discardingLine = false;
 
 void parseLine(NmeaStats& stats) {
   if (lineLength < 7 || line[0] != '$') return;
@@ -33,14 +34,18 @@ void parseLine(NmeaStats& stats) {
 
 void consumeNmeaByte(char byte, NmeaStats& stats) {
   if (byte == '\n') {
-    parseLine(stats);
+    if (!discardingLine) parseLine(stats);
     lineLength = 0;
+    discardingLine = false;
   } else if (byte == '\r') {
+    return;
+  } else if (discardingLine) {
     return;
   } else if (lineLength < kLineCapacity - 1) {
     line[lineLength++] = byte;
     line[lineLength] = '\0';
   } else {
     lineLength = 0;
+    discardingLine = true;
   }
 }

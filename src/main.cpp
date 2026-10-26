@@ -15,16 +15,20 @@ NmeaStats nmeaStats;
 bool bleConnected = false;
 unsigned long rtcmBytes = 0;
 unsigned long lastStatusMs = 0;
-
-struct GnssWriter {
-  size_t write(const uint8_t* bytes, size_t size) { return gnss.write(bytes, size); }
-};
+portMUX_TYPE sharedMux = portMUX_INITIALIZER_UNLOCKED;
+RtcmBuffer<config::kRtcmBufferSize> rtcmBuffer;
 
 class ServerCallbacks final : public BLEServerCallbacks {
  public:
-  void onConnect(BLEServer*) override { bleConnected = true; }
+  void onConnect(BLEServer*) override {
+    portENTER_CRITICAL(&sharedMux);
+    bleConnected = true;
+    portEXIT_CRITICAL(&sharedMux);
+  }
   void onDisconnect(BLEServer*) override {
+    portENTER_CRITICAL(&sharedMux);
     bleConnected = false;
+    portEXIT_CRITICAL(&sharedMux);
     BLEDevice::startAdvertising();
   }
 };
@@ -32,10 +36,10 @@ class ServerCallbacks final : public BLEServerCallbacks {
 class RtcmCallbacks final : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* characteristic) override {
     const String value = characteristic->getValue();
-    GnssWriter writer;
-    if (forwardRtcm(reinterpret_cast<const uint8_t*>(value.c_str()), value.length(), writer)) {
+    portENTER_CRITICAL(&sharedMux);
+    if (rtcmBuffer.enqueue(reinterpret_cast<const uint8_t*>(value.c_str()), value.length()))
       rtcmBytes += value.length();
-    }
+    portEXIT_CRITICAL(&sharedMux);
   }
 };
 
@@ -59,11 +63,19 @@ void startBle() {
 
 void publishStatus() {
   char status[128];
+  NmeaStats stats;
+  unsigned long forwardedBytes;
+  bool connected;
+  portENTER_CRITICAL(&sharedMux);
+  stats = nmeaStats;
+  forwardedBytes = rtcmBytes;
+  connected = bleConnected;
+  portEXIT_CRITICAL(&sharedMux);
   snprintf(status, sizeof(status), "connected=%u,fix=%lu,gga=%lu,checksum_errors=%lu,rtcm_bytes=%lu",
-           bleConnected ? 1U : 0U, nmeaStats.fixQuality, nmeaStats.ggaSentences,
-           nmeaStats.checksumErrors, rtcmBytes);
+           connected ? 1U : 0U, stats.fixQuality, stats.ggaSentences,
+           stats.checksumErrors, forwardedBytes);
   txCharacteristic->setValue(reinterpret_cast<uint8_t*>(status), strlen(status));
-  if (bleConnected) txCharacteristic->notify();
+  if (connected) txCharacteristic->notify();
 }
 }
 
@@ -75,12 +87,21 @@ void setup() {
 }
 
 void loop() {
+  uint8_t chunk[config::kRtcmChunkSize];
+  size_t chunkLength;
+  portENTER_CRITICAL(&sharedMux);
+  chunkLength = rtcmBuffer.drain(sizeof(chunk), chunk);
+  portEXIT_CRITICAL(&sharedMux);
+  if (chunkLength > 0) gnss.write(chunk, chunkLength);
   while (gnss.available() > 0) {
     const int value = gnss.read();
     if (value >= 0) {
       char byte = static_cast<char>(value);
+      portENTER_CRITICAL(&sharedMux);
       consumeNmeaByte(byte, nmeaStats);
-      if (bleConnected && txCharacteristic != nullptr) {
+      const bool connected = bleConnected;
+      portEXIT_CRITICAL(&sharedMux);
+      if (connected && txCharacteristic != nullptr) {
         txCharacteristic->setValue(reinterpret_cast<uint8_t*>(&byte), 1);
         txCharacteristic->notify();
       }
