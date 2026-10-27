@@ -66,15 +66,23 @@ References: [ZED-F9P-01B data sheet](https://content.u-blox.com/sites/default/fi
 
 ## Build and host tests
 
-Install PlatformIO Core. The `esp32-s3` environment targets an ESP32-S3 N16R8 board with 16 MB flash and 8 MB octal PSRAM.
+Install Make and PlatformIO Core. Host tests also require a C++17 compiler. The `esp32-s3` environment targets an ESP32-S3 N16R8 board with 16 MB flash and 8 MB octal PSRAM.
 
 ```sh
-pio run -e esp32-s3
-pio run -e esp32-s3 -t upload
-pio device monitor -b 115200
+make test
+make build
+make upload
+make monitor
 ```
 
-Use the ESP32 board's USB-to-UART connector for upload and diagnostic output. If multiple serial devices appear, select the ESP32 port with `--upload-port` or the monitor's `--port` option. The receiver's USB port is separate.
+`make` defaults to `make build`. The monitor uses the 115200 baud setting from `platformio.ini`.
+
+Use the ESP32 board's USB-to-UART connector for upload and diagnostic output. The receiver's USB port is separate. If multiple serial devices appear, use PlatformIO directly to select the ESP32 port:
+
+```sh
+pio run -e esp32-s3 -t upload --upload-port /path/to/esp32-port
+pio device monitor -e esp32-s3 --port /path/to/esp32-port
+```
 
 The monitor shows startup diagnostics, including the free-heap measurement at boot. Run host-only protocol tests with:
 
