@@ -37,7 +37,7 @@ Connect TX to RX in each direction. The firmware uses ESP32 hardware UART1, with
 
 The photo shows an SMA antenna connector at the bottom and a small coaxial connector labeled `J4`. Their routing and antenna-bias circuitry require the carrier schematic. Do not assume both connectors support simultaneous use.
 
-## ZED-F9P receiver setup
+## ZED-F9P receiver configuration
 
 The firmware does not configure the receiver. Configure it through the receiver board's USB connection with u-blox u-center or another compatible configuration tool.
 
@@ -47,12 +47,32 @@ Factory UART1 settings are normally **38400 baud, 8N1**, with NMEA output and RT
 2. Set receiver UART1 to 38400 baud, 8 data bits, no parity, and one stop bit.
 3. Enable RTCM 3 input on UART1 (`CFG-UART1INPROT-RTCM3X`).
 4. Enable NMEA output on UART1 (`CFG-UART1OUTPROT-NMEA`).
-5. Enable GGA and RMC messages on UART1. For SW Maps satellite and accuracy displays, also enable GSA, GSV, and GST.
+5. Enable the UART1 NMEA messages listed below.
 6. Disable periodic UBX and RTCM output on UART1 to keep the rover's output stream NMEA-only.
 7. Disable time mode (`CFG-TMODE-MODE = 0`) for rover use. Do not enable base-station survey-in or fixed-position mode.
 8. Start with a 1 Hz navigation rate and a small NMEA message set to limit BLE traffic.
 9. Save the configuration to supported persistent storage, not only RAM.
 10. Restart the receiver and verify that the settings persist.
+
+### UART1 NMEA messages
+
+[SW Maps documents](https://aviyaantech.com/swmaps/) these NMEA sentence requirements:
+
+| Sentences | SW Maps display | UART1 configuration |
+| --- | --- | --- |
+| GGA, RMC | Position and time | Enable both messages in the message-output settings |
+| GSA, GSV | Satellite status and skyplot | Enable both messages in the message-output settings |
+| GST | Latitude Error, Longitude Error, Horizontal Accuracy, and Vertical Accuracy | Set `CFG-MSGOUT-NMEA_ID_GST_UART1` to `1` |
+
+The GST rate of `1` means output once per navigation cycle. Save these message settings with the rest of the receiver configuration.
+
+If accuracy fields show `N/A`, verify `$GNGST` or `$GPGST` output on **UART1**, not only USB. USB output settings are separate. Reconnect SW Maps and check the accuracy fields under **GNSS Status**.
+
+The bridge already forwards GST without a firmware change. Its periodic serial samples capture only part of the stream. A missing GST sentence in those samples does not prove that UART1 GST output is absent.
+
+GST values describe receiver-estimated errors, not guaranteed real-world accuracy. A standalone GNSS fix can provide error estimates without RTK corrections.
+
+### Baud rate, rover operation, and precision
 
 Configuration names and tool menus depend on the receiver firmware. If you change the receiver's UART1 baud rate, change `kGnssBaud` in `include/config.h` to match. Pin constants are in the same file. The serial console remains at 115200 baud.
 
@@ -130,7 +150,7 @@ Service UUID: `6e400001-b5a3-f393-e0a9-e50e24dcca9e` (Nordic-UART-style UUIDs).
 * RX `6e400002-b5a3-f393-e0a9-e50e24dcca9e`: write or write-without-response. Each write payload is forwarded unchanged to GNSS UART; payloads are treated as opaque binary (not UTF-8 or NMEA).
 * TX `6e400003-b5a3-f393-e0a9-e50e24dcca9e`: notifications/read. Receiver UART bytes use chunks of up to 20 bytes, compatible with the default ATT MTU of 23 bytes. Full chunks send immediately. After each UART drain, a partial chunk sends if at least 20 ms have elapsed since the previous notification. Concatenate notifications to reconstruct the stream, including original CR/LF sentence endings. A notification can contain part of a sentence or cross a sentence boundary. Reads return the latest chunk, not a complete sentence or history. No diagnostic status text is inserted into this stream.
 
-Configure receiver UART1 output for NMEA only. The bridge does not filter binary output or change talker IDs. It does not replay bytes received while disconnected or guarantee notification delivery. Batching reduces notification overhead, but SW Maps interoperability still requires a hardware check.
+Use the [receiver configuration](#zed-f9p-receiver-configuration) above. The bridge does not filter binary output or change talker IDs. It does not replay bytes received while disconnected or guarantee notification delivery. Batching reduces notification overhead, but SW Maps interoperability still requires a hardware check.
 
 ## SW Maps setup checklist
 
@@ -139,26 +159,7 @@ Configure receiver UART1 output for NMEA only. The bridge does not filter binary
 3. Configure the correction source/NTRIP client in the app and select the RX characteristic as correction output if supported.
 4. Confirm NMEA updates and RTK status on the receiver; compare the receiver's own status output with the firmware status.
 
-### Satellite and accuracy displays
-
-[SW Maps documents](https://aviyaantech.com/swmaps/) these NMEA sentence requirements:
-
-| Sentences | SW Maps display |
-| --- | --- |
-| GGA, RMC | Position and time |
-| GSA, GSV | Satellite status and skyplot |
-| GST | Latitude Error, Longitude Error, Horizontal Accuracy, and Vertical Accuracy |
-
-If accuracy fields show `N/A`, check GST output on the receiver's **UART1**. USB output settings are separate.
-
-1. In u-center, set `CFG-MSGOUT-NMEA_ID_GST_UART1` to `1` for output once per navigation cycle.
-2. Save the setting to supported persistent storage.
-3. Verify `$GNGST` or `$GPGST` output on UART1, not only the receiver's USB connection.
-4. Reconnect SW Maps and check the accuracy fields under **GNSS Status**.
-
-The bridge already forwards GST without a firmware change. Its periodic serial samples capture only part of the stream. A missing GST sentence in those samples does not prove that UART1 GST output is absent.
-
-GST values describe receiver-estimated errors, not guaranteed real-world accuracy. A standalone GNSS fix can provide error estimates without RTK corrections.
+For satellite and accuracy displays, use the NMEA message settings in [receiver configuration](#zed-f9p-receiver-configuration).
 
 The user confirmed valid SW Maps positioning with the batched NMEA stream. Accuracy fields, NTRIP corrections, and RTK operation still require hardware checks.
 
