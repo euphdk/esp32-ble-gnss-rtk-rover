@@ -1,6 +1,6 @@
 # ESP32 BLE GNSS RTK rover prototype
 
-This Arduino prototype connects an ESP32-S3 N16R8 development board to a u-blox ZED-F9P GNSS receiver. It uses BLE only, without Bluetooth Classic.
+This Arduino prototype connects an ESP32 development board to a u-blox ZED-F9P GNSS receiver. Two targets are supported: the ESP32-S3 N16R8 board and the ESP32-C3 SuperMini board. It uses BLE only, without Bluetooth Classic.
 
 The BLE RX characteristic accepts correction bytes for the receiver. The BLE TX characteristic provides only receiver UART bytes. Status output uses the serial console.
 
@@ -16,6 +16,8 @@ Use the white six-pin connector labeled `GND`, `NC`, `NC`, `TX1`, `RX1`, and `5V
 
 Disconnect power before connecting wires. Identify each contact by its board label, not by cable color.
 
+### ESP32-S3 (default target `esp32-s3`)
+
 | ESP32-S3 | ZED-F9P board, white six-pin connector |
 | --- | --- |
 | GPIO16 (GNSS RX) | TX1 |
@@ -23,7 +25,16 @@ Disconnect power before connecting wires. Identify each contact by its board lab
 | GND | GND |
 | No connection | NC, NC |
 
-Connect TX to RX in each direction. The firmware uses ESP32 hardware UART1, with RX on GPIO16 and TX on GPIO17. ESP32 UART numbering is independent of the receiver's UART numbering. USB serial carries diagnostic output.
+### ESP32-C3 SuperMini (target `esp32-c3`)
+
+| ESP32-C3 | ZED-F9P board, white six-pin connector |
+| --- | --- |
+| GPIO4 (GNSS RX) | TX1 |
+| GPIO5 (GNSS TX) | RX1 |
+| GND | GND |
+| No connection | NC, NC |
+
+Connect TX to RX in each direction. The firmware uses ESP32 hardware UART1. The UART1 pin pair comes from the selected PlatformIO environment: RX on GPIO16 and TX on GPIO17 for the ESP32-S3 target, RX on GPIO4 and TX on GPIO5 for the ESP32-C3 target. ESP32 UART numbering is independent of the receiver's UART numbering. USB serial carries diagnostic output.
 
 ### Power and antenna
 
@@ -74,7 +85,7 @@ GST values describe receiver-estimated errors, not guaranteed real-world accurac
 
 ### Baud rate, rover operation, and precision
 
-Configuration names and tool menus depend on the receiver firmware. If you change the receiver's UART1 baud rate, change `kGnssBaud` in `include/config.h` to match. Pin constants are in the same file. The serial console remains at 115200 baud.
+Configuration names and tool menus depend on the receiver firmware. If you change the receiver's UART1 baud rate, change `kGnssBaud` in `include/config.h` to match. The serial console remains at 115200 baud. UART1 pin numbers come from the `GNSS_RX_PIN` and `GNSS_TX_PIN` build flags of each environment in `platformio.ini`; `include/config.h` keeps the ESP32-S3 pair as fallback defaults.
 
 UART2 normally serves correction traffic and does not output NMEA by default. Connecting this bridge to `TX2`/`RX2` without receiver configuration will not provide the expected NMEA stream.
 
@@ -86,22 +97,36 @@ References: [ZED-F9P-01B data sheet](https://content.u-blox.com/sites/default/fi
 
 ## Build and host tests
 
-Install Make and PlatformIO Core. Host tests also require a C++17 compiler. The `esp32-s3` environment targets an ESP32-S3 N16R8 board with 16 MB flash and 8 MB octal PSRAM.
+Install Make and PlatformIO Core. Host tests also require a C++17 compiler. The `esp32-s3` environment targets an ESP32-S3 N16R8 board with 16 MB flash and 8 MB octal PSRAM. The `esp32-c3` environment targets an ESP32-C3 SuperMini board (the `esp32-c3-devkitm-1` board definition, 4 MB flash, no PSRAM).
+
+`make` defaults to `make build` for the ESP32-S3 target. Select the target with `ENV`:
 
 ```sh
 make test
 make build
 make upload
 make monitor
+
+make build ENV=esp32-c3
+make upload ENV=esp32-c3
+make monitor ENV=esp32-c3
 ```
 
-`make` defaults to `make build`. The monitor uses the 115200 baud setting from `platformio.ini`.
+The monitor uses the 115200 baud setting from `platformio.ini`.
 
-Use the ESP32 board's USB-to-UART connector for upload and diagnostic output. The receiver's USB port is separate. If multiple serial devices appear, use PlatformIO directly to select the ESP32 port:
+### Upload and console ports
+
+ESP32-S3: use the board's USB-to-UART connector for upload and diagnostic output. The receiver's USB port is separate.
+
+ESP32-C3 SuperMini: the board exposes only its native USB connection, without a USB-to-UART bridge. The `esp32-c3` build enables the USB CDC console (`ARDUINO_USB_CDC_ON_BOOT=1`, `ARDUINO_USB_MODE=1`), so `Serial` output appears on the board's USB port at 115200 baud. Upload and monitor through that same port. Many SuperMini clones do not enter the bootloader automatically; if the upload times out, press the `BOOT`/`GPIO9` button while resetting or plugging in the board. The CDC port disappears while the board is in the bootloader or resetting, so the port name can change between phases. These port behaviors are not verified on hardware.
+
+If multiple serial devices appear, use PlatformIO directly to select the ESP32 port:
 
 ```sh
 pio run -e esp32-s3 -t upload --upload-port /path/to/esp32-port
 pio device monitor -e esp32-s3 --port /path/to/esp32-port
+pio run -e esp32-c3 -t upload --upload-port /path/to/esp32-port
+pio device monitor -e esp32-c3 --port /path/to/esp32-port
 ```
 
 The monitor shows startup diagnostics, including the free-heap measurement at boot. Run host-only protocol tests with:
@@ -116,8 +141,8 @@ The project pins PlatformIO's Espressif32 platform to `~8.0.0`; BLE uses the Ard
 
 Serial diagnostics are enabled by default through `kSerialDebug` in `include/config.h`.
 
-1. Upload the firmware with `pio run -e esp32-s3 -t upload`.
-2. Open `pio device monitor -b 115200` on the ESP32's USB-to-UART port.
+1. Upload the firmware with `make upload` or `make upload ENV=esp32-c3`.
+2. Open `pio device monitor -b 115200` on the ESP32's console port: the USB-to-UART port on the ESP32-S3, the native USB CDC port on the ESP32-C3 SuperMini.
 3. Press the ESP32 reset button to see the startup baud rate and GPIO assignments.
 4. Connect SW Maps and capture several seconds of console output.
 
@@ -133,7 +158,7 @@ Each second, the console shows BLE connection state, GGA fix quality, sentence c
 
 `[gnss hex]` shows the sample as hexadecimal bytes. `[gnss text]` shows the same bytes, with dots for nonprintable bytes. Samples are partial data, not necessarily complete sentences. The console does not echo the full UART stream.
 
-- If `gnss_rx_bytes` stays zero, check receiver power, shared ground, and `TX1` to GPIO16 wiring.
+- If `gnss_rx_bytes` stays zero, check receiver power, shared ground, and `TX1` to the configured GNSS RX pin wiring (GPIO16 on the ESP32-S3 target, GPIO4 on the ESP32-C3 target).
 - If bytes arrive without valid NMEA, compare the receiver's UART1 baud rate with the startup log.
 - If the text sample is unreadable, check baud rate and signal levels. Binary UBX output can also produce unreadable text.
 - If `nmea` increases but `gga` stays zero, enable GGA output on receiver UART1.
@@ -179,4 +204,4 @@ GGA fix quality normally reports `1` for standalone GNSS, `2` for differential G
 
 `rtcm_bytes` counts bytes accepted into the ESP32 correction buffer. It does not confirm delivery to the receiver or successful RTCM decoding. The firmware does not validate RTCM framing or guarantee RTK operation.
 
-Verified locally: the ESP32-S3 target build and host protocol tests. Hardware checks remain open for this receiver board, BLE throughput, SW Maps, and RTCM acceptance. Serial output provides the boot-time free-heap value, but no hardware measurement is recorded here.
+Verified locally: the ESP32-S3 and ESP32-C3 target builds compile, and host protocol tests pass. Neither board has been tested against this receiver hardware, and hardware checks remain open for the receiver board, BLE throughput, SW Maps, and RTCM acceptance. The ESP32-C3 target is built from the shared sources with the wiring above; it is unverified on a SuperMini board. Serial output provides the boot-time free-heap value, but no hardware measurement is recorded here.

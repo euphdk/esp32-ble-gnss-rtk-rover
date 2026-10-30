@@ -86,7 +86,8 @@ void publishStatus() {
     Serial.printf("[debug] %s,nmea=%lu,gnss_rx_bytes=%lu,ble_nmea_notify_calls=%lu\n",
                   status, stats.sentences, gnssBytes, bleNmeaNotifyCalls);
     if (gnssBytes == 0) {
-      Serial.println("[gnss] No UART bytes received. Check power, GND, TX1 -> GPIO16, and baud rate.");
+      Serial.printf("[gnss] No UART bytes received. Check power, GND, TX1 -> GPIO%d, and baud rate.\n",
+                    config::kGnssRxPin);
     } else {
       Serial.printf("[gnss] last_rx_age_ms=%lu,sample_bytes=%u\n",
                     millis() - lastGnssMs, static_cast<unsigned int>(gnssSampleLength));

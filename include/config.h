@@ -2,9 +2,19 @@
 
 #include <Arduino.h>
 
+// UART1 pins come from the PlatformIO environment build flags
+// (esp32-s3: GPIO16/17, esp32-c3: GPIO4/5). Defaults keep the S3 wiring.
+#ifndef GNSS_RX_PIN
+#define GNSS_RX_PIN 16
+#endif
+
+#ifndef GNSS_TX_PIN
+#define GNSS_TX_PIN 17
+#endif
+
 namespace config {
-constexpr int kGnssRxPin = 16;
-constexpr int kGnssTxPin = 17;
+constexpr int kGnssRxPin = GNSS_RX_PIN;
+constexpr int kGnssTxPin = GNSS_TX_PIN;
 constexpr uint32_t kGnssBaud = 38400;
 constexpr uint32_t kConsoleBaud = 115200;
 constexpr bool kSerialDebug = true;
