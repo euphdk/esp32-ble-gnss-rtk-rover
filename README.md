@@ -1,6 +1,6 @@
 # ESP32 BLE GNSS RTK rover prototype
 
-This Arduino prototype connects an ESP32 development board to a u-blox ZED-F9P GNSS receiver. Two targets are supported: the ESP32-S3 N16R8 board and the ESP32-C3 SuperMini board. It uses BLE only, without Bluetooth Classic.
+This Arduino prototype connects an ESP32 development board to a u-blox ZED-F9P or Quectel LC29H(DA) GNSS receiver. Two targets are supported: the ESP32-S3 N16R8 board and the ESP32-C3 SuperMini board. It uses BLE only, without Bluetooth Classic.
 
 The BLE RX characteristic accepts correction bytes for the receiver. The BLE TX characteristic provides only receiver UART bytes. Status output uses the serial console.
 
@@ -50,7 +50,7 @@ The photo shows an SMA antenna connector at the bottom and a small coaxial conne
 
 ## ZED-F9P receiver configuration
 
-The firmware does not configure the receiver. Configure it through the receiver board's USB connection with u-blox u-center or another compatible configuration tool.
+The default ZED-F9P builds do not configure the receiver. Configure it through the receiver board's USB connection with u-blox u-center or another compatible configuration tool.
 
 Factory UART1 settings are normally **38400 baud, 8N1**, with NMEA output and RTCM 3 input enabled. A seller or previous owner can change these settings. This firmware expects **38400 baud, 8N1** by default.
 
@@ -85,7 +85,7 @@ GST values describe receiver-estimated errors, not guaranteed real-world accurac
 
 ### Baud rate, rover operation, and precision
 
-Configuration names and tool menus depend on the receiver firmware. If you change the receiver's UART1 baud rate, change `kGnssBaud` in `include/config.h` to match. The serial console remains at 115200 baud. UART1 pin numbers come from the `GNSS_RX_PIN` and `GNSS_TX_PIN` build flags of each environment in `platformio.ini`; `include/config.h` keeps the ESP32-S3 pair as fallback defaults.
+Configuration names and tool menus depend on the receiver firmware. If you change the receiver's UART1 baud rate, change `kGnssBaud` in `include/gnss_receiver.h` to match. The serial console remains at 115200 baud. UART1 pin numbers come from the `GNSS_RX_PIN` and `GNSS_TX_PIN` build flags of each environment in `platformio.ini`; `include/config.h` keeps the ESP32-S3 pair as fallback defaults.
 
 UART2 normally serves correction traffic and does not output NMEA by default. Connecting this bridge to `TX2`/`RX2` without receiver configuration will not provide the expected NMEA stream.
 
@@ -94,6 +94,41 @@ For RTK, supply compatible RTCM 3 corrections from an NTRIP service or base stat
 For higher position precision in NMEA, consider `CFG-NMEA-HIGHPREC` after checking the client application's support. The status parser discards sentences longer than 127 characters. Raw UART bytes still pass to BLE.
 
 References: [ZED-F9P-01B data sheet](https://content.u-blox.com/sites/default/files/documents/ZED-F9P-01B_DataSheet_UBX-17051259.pdf) and [ZED-F9P integration manual](https://content.u-blox.com/sites/default/files/ZED-F9P_IntegrationManual_UBX-18010802.pdf). Use the interface description that matches the installed receiver firmware.
+
+## LC29H(DA) receiver configuration
+
+Select `esp32-s3-lc29h-da` or `esp32-c3-lc29h-da` for the Quectel LC29H(DA). Other LC29H variants are not covered.
+These builds use **115200 baud, 8N1**. They keep the selected ESP32 board's UART pins and BLE service unchanged.
+Connect receiver TX to ESP32 GNSS RX, receiver RX to ESP32 GNSS TX, and connect both grounds.
+Use 3.3 V UART logic. Check the LC29H(DA) carrier's power ratings and connector labels before connection.
+The ZED-F9P photo, power instructions, and connector pinout above do not describe an LC29H(DA) carrier.
+
+On every ESP32 boot, the firmware waits 1200 ms after UART startup, then sends these command bodies in order:
+
+```text
+PQTMCFGRCVRMODE,W,1
+PQTMCFGRTK,W,1,1
+PQTMCFGPROT,W,1,1,00000005,00000005
+PQTMCFGMSGRATE,W,GGA,1
+PQTMCFGMSGRATE,W,RMC,1
+PQTMCFGMSGRATE,W,GSA,1
+PQTMCFGMSGRATE,W,GSV,1
+PQTMCFGMSGRATE,W,VTG,0
+PQTMCFGMSGRATE,W,GLL,0
+PQTMCFGMSGRATE,W,ZDA,0
+```
+
+Each command uses `$body*XX\r\n` framing. `XX` is the two-digit hexadecimal XOR checksum of the body.
+The firmware waits 250 ms between commands. BLE starts after this sequence, approximately 3.45 seconds after UART startup.
+These commands match the supplied LC29H(DA) reference project. The firmware sends them again because they are not persisted.
+There are no acknowledgment waits or retries. A short UART write stops setup and prints a console error, but BLE still starts.
+The success log confirms writes only, not receiver acceptance. Power the receiver before resetting the ESP32.
+After a receiver-only reset, reset the ESP32 to send the commands again.
+
+This message set enables GGA, RMC, GSA, and GSV. It does not configure GST or promise SW Maps accuracy fields.
+The bridge still forwards all receiver bytes, including command responses, without filtering.
+Supply RTCM corrections through the BLE client. The firmware adds no Wi-Fi or NTRIP client.
+LC29H(DA) command acceptance, RTK operation, and BLE interoperability require hardware checks.
 
 ## Build and host tests
 
@@ -110,9 +145,19 @@ make monitor
 make build ENV=esp32-c3
 make upload ENV=esp32-c3
 make monitor ENV=esp32-c3
+
+make build ENV=esp32-s3-lc29h-da
+make upload ENV=esp32-s3-lc29h-da
+make monitor ENV=esp32-s3-lc29h-da
+
+make build ENV=esp32-c3-lc29h-da
+make upload ENV=esp32-c3-lc29h-da
+make monitor ENV=esp32-c3-lc29h-da
 ```
 
 The monitor uses the 115200 baud setting from `platformio.ini`.
+The original `esp32-s3` and `esp32-c3` environments still select ZED-F9P at 38400 baud without startup commands.
+Custom environments can set `-DGNSS_RECEIVER=GNSS_RECEIVER_LC29H_DA`. Unsupported receiver values fail compilation.
 
 ### Upload and console ports
 
@@ -135,7 +180,7 @@ The monitor shows startup diagnostics, including the free-heap measurement at bo
 sh test/host/run.sh
 ```
 
-The project pins PlatformIO's Espressif32 platform to `~8.0.0`; BLE uses the Arduino ESP32 core's bundled `BLEDevice` GATT API. Host tests cover NMEA checksum/fix parsing, BLE UART batching, and binary RTCM byte-preserving forwarding, including short writes. The host tests do not compile or emulate the ESP32 BLE stack.
+The project pins PlatformIO's Espressif32 platform to `~8.0.0`; BLE uses the Arduino ESP32 core's bundled `BLEDevice` GATT API. Host tests cover NMEA checksum/fix parsing, BLE UART batching, and binary RTCM byte-preserving forwarding, including short writes. Receiver tests check baud selection, command bytes, checksums, delays, repeated boots, and write failure without receiver responses. The host tests do not compile or emulate the ESP32 BLE stack.
 
 ## Serial diagnostics
 
@@ -175,7 +220,7 @@ Service UUID: `6e400001-b5a3-f393-e0a9-e50e24dcca9e` (Nordic-UART-style UUIDs).
 * RX `6e400002-b5a3-f393-e0a9-e50e24dcca9e`: write or write-without-response. Each write payload is forwarded unchanged to GNSS UART; payloads are treated as opaque binary (not UTF-8 or NMEA).
 * TX `6e400003-b5a3-f393-e0a9-e50e24dcca9e`: notifications/read. Receiver UART bytes use chunks of up to 20 bytes, compatible with the default ATT MTU of 23 bytes. Full chunks send immediately. After each UART drain, a partial chunk sends if at least 20 ms have elapsed since the previous notification. Concatenate notifications to reconstruct the stream, including original CR/LF sentence endings. A notification can contain part of a sentence or cross a sentence boundary. Reads return the latest chunk, not a complete sentence or history. No diagnostic status text is inserted into this stream.
 
-Use the [receiver configuration](#zed-f9p-receiver-configuration) above. The bridge does not filter binary output or change talker IDs. It does not replay bytes received while disconnected or guarantee notification delivery. Batching reduces notification overhead, but SW Maps interoperability still requires a hardware check.
+Use the configuration for [ZED-F9P](#zed-f9p-receiver-configuration) or [LC29H(DA)](#lc29hda-receiver-configuration) above. The bridge does not filter binary output or change talker IDs. It does not replay bytes received while disconnected or guarantee notification delivery. Batching reduces notification overhead, but SW Maps interoperability still requires a hardware check.
 
 ## SW Maps setup checklist
 

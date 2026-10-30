@@ -1,6 +1,9 @@
 #pragma once
 
-#include <Arduino.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#include "gnss_receiver.h"
 
 // UART1 pins come from the PlatformIO environment build flags
 // (esp32-s3: GPIO16/17, esp32-c3: GPIO4/5). Defaults keep the S3 wiring.
@@ -15,7 +18,6 @@
 namespace config {
 constexpr int kGnssRxPin = GNSS_RX_PIN;
 constexpr int kGnssTxPin = GNSS_TX_PIN;
-constexpr uint32_t kGnssBaud = 38400;
 constexpr uint32_t kConsoleBaud = 115200;
 constexpr bool kSerialDebug = true;
 constexpr char kDeviceName[] = "GNSS-RTK-Rover";

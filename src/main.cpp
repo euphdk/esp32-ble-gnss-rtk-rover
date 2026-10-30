@@ -111,9 +111,15 @@ void setup() {
   Serial.begin(config::kConsoleBaud);
   gnss.begin(config::kGnssBaud, SERIAL_8N1, config::kGnssRxPin, config::kGnssTxPin);
   if (config::kSerialDebug) {
-    Serial.printf("[gnss] UART1 baud=%lu,8N1,rx_gpio=%d,tx_gpio=%d\n",
+    Serial.printf("[gnss] receiver=%s,UART1 baud=%lu,8N1,rx_gpio=%d,tx_gpio=%d\n",
+                  config::kReceiverName,
                   static_cast<unsigned long>(config::kGnssBaud),
                   config::kGnssRxPin, config::kGnssTxPin);
+  }
+  const bool configured = configureGnss(gnss, [](uint32_t ms) { delay(ms); });
+  if (config::kLc29hDa) {
+    Serial.println(configured ? "[gnss] Startup commands sent (not acknowledged)"
+                              : "[gnss] Startup command write failed. Check receiver configuration.");
   }
   startBle();
   Serial.printf("GNSS BLE rover started; free heap=%lu bytes\n", static_cast<unsigned long>(ESP.getFreeHeap()));
