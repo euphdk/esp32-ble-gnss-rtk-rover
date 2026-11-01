@@ -2,9 +2,11 @@
 
 This Arduino prototype connects an ESP32 development board to a u-blox ZED-F9P or Quectel LC29H(DA) GNSS receiver. Two targets are supported: the ESP32-S3 N16R8 board and the ESP32-C3 SuperMini board. It uses BLE only, without Bluetooth Classic.
 
-The BLE RX characteristic accepts correction bytes for the receiver. The BLE TX characteristic provides only receiver UART bytes. Status output uses the serial console.
+The BLE RX characteristic accepts correction bytes for the receiver. The BLE TX characteristic provides only receiver UART bytes. Status output uses the serial console and an optional OLED.
 
-## Receiver board
+## Receiver boards
+
+### ZED-F9P board
 
 The supplied photo shows a ZED-F9P-01B-01 module on a board marked `URTK1.2`.
 
@@ -12,11 +14,21 @@ The supplied photo shows a ZED-F9P-01B-01 module on a board marked `URTK1.2`.
 
 Use the white six-pin connector labeled `GND`, `NC`, `NC`, `TX1`, `RX1`, and `5V`. These labels identify the receiver's UART1 connection. The side header also exposes `TX2` and `RX2` for UART2. This setup does not use UART2.
 
+### LC29H(DA) board
+
+The LC29H(DA) photo shows a carrier with a seven-pin header and a small coaxial connector.
+
+![LC29H(DA) receiver board and header labels](71UH+POQd1L._AC_SL1500_.jpg)
+
+The header labels are `V`, `G`, `T1`, `R1`, `R2`, `T2`, and `P`, as shown in the photo.
+The photo alone does not establish their functions, voltage ratings, or UART routing.
+Confirm these details with the carrier supplier or schematic before connection.
+
 ## Wiring
 
 Disconnect power before connecting wires. Identify each contact by its board label, not by cable color.
 
-### ESP32-S3 (default target `esp32-s3`)
+### ZED-F9P with ESP32-S3 (default target `esp32-s3`)
 
 | ESP32-S3 | ZED-F9P board, white six-pin connector |
 | --- | --- |
@@ -25,7 +37,7 @@ Disconnect power before connecting wires. Identify each contact by its board lab
 | GND | GND |
 | No connection | NC, NC |
 
-### ESP32-C3 SuperMini (target `esp32-c3`)
+### ZED-F9P with ESP32-C3 SuperMini (target `esp32-c3`)
 
 | ESP32-C3 | ZED-F9P board, white six-pin connector |
 | --- | --- |
@@ -36,7 +48,22 @@ Disconnect power before connecting wires. Identify each contact by its board lab
 
 Connect TX to RX in each direction. The firmware uses ESP32 hardware UART1. The UART1 pin pair comes from the selected PlatformIO environment: RX on GPIO16 and TX on GPIO17 for the ESP32-S3 target, RX on GPIO4 and TX on GPIO5 for the ESP32-C3 target. ESP32 UART numbering is independent of the receiver's UART numbering. USB serial carries diagnostic output.
 
-### Power and antenna
+### LC29H(DA) wiring
+
+Confirm which carrier contacts provide receiver TX, receiver RX, and ground before connecting them.
+Confirm that the selected receiver UART accepts commands and RTCM and outputs NMEA at 115200 baud.
+
+| Receiver signal | ESP32-S3 | ESP32-C3 SuperMini |
+| --- | --- | --- |
+| TX | GPIO16 (GNSS RX) | GPIO4 (GNSS RX) |
+| RX | GPIO17 (GNSS TX) | GPIO5 (GNSS TX) |
+| Ground | GND | GND |
+
+Use 3.3 V UART logic. Confirm the carrier's power input and voltage rating before applying power.
+Connect a suitable GNSS antenna after confirming the carrier's antenna and active-antenna requirements with the supplier.
+The photo does not establish the functions of the other header contacts. Leave them unconnected unless their functions are confirmed.
+
+### ZED-F9P power and antenna
 
 - UART signals must use 3.3 V logic. Never connect 5 V to an ESP32 GPIO or a receiver UART pin.
 - The connector's `5V` label refers to board power, not UART voltage. The bare ZED-F9P module requires a regulated supply below 5 V.
@@ -47,6 +74,59 @@ Connect TX to RX in each direction. The firmware uses ESP32 hardware UART1. The 
 - Connect a suitable multiband GNSS antenna to the board's antenna input. Confirm active-antenna voltage and current requirements with the board supplier.
 
 The photo shows an SMA antenna connector at the bottom and a small coaxial connector labeled `J4`. Their routing and antenna-bias circuitry require the carrier schematic. Do not assume both connectors support simultaneous use.
+
+## Optional 64×48 I2C OLED
+
+OLED support is disabled in all original environments. Append `-oled` to any environment name to enable it:
+
+```sh
+make build ENV=esp32-s3-oled
+make build ENV=esp32-c3-oled
+make build ENV=esp32-s3-lc29h-da-oled
+make build ENV=esp32-c3-lc29h-da-oled
+```
+
+Use the same environment for upload and monitor. These environments add the Adafruit SSD1306 and GFX libraries.
+The firmware assumes a 64×48 SSD1306 at I2C address `0x3C`, internal charge pump, and no separate reset wire.
+It uses the library's default controller initialization and column/page addressing, without a module-specific offset.
+Some 64×48 modules need different offsets or use another controller. Those modules are not covered by this configuration.
+
+Disconnect power before connection. Use a module that supports 3.3 V power and 3.3 V I2C signals.
+Check the module's pin labels and pull-up voltage. Do not use pull-ups to 5 V.
+
+| OLED | ESP32-S3 | ESP32-C3 SuperMini |
+| --- | --- | --- |
+| VCC | 3V3 | 3V3 |
+| GND | GND | GND |
+| SDA | GPIO8 | GPIO6 |
+| SCL | GPIO9 | GPIO7 |
+
+These pins avoid the configured GNSS UART pins, USB pins, and boot strapping pins on each target.
+They assume the board exposes these GPIOs without other peripherals attached. Check your board before connection.
+Pin flags are in `platformio.ini`. The I2C address is `kOledAddress` in `include/config.h`.
+
+The display updates about once per second. It shows the latest valid GGA quality and BLE connection state:
+
+| Display | Meaning |
+| --- | --- |
+| `NO GGA` | No checksum-valid GGA with a valid quality field received since boot |
+| `GGA STALE` | No valid GGA quality update for at least five seconds |
+| `NO FIX` | GGA quality 0 |
+| `GNSS` | GGA quality 1 |
+| `DGPS` | GGA quality 2 |
+| `RTK FIX` | GGA quality 4 |
+| `RTK FLOAT` | GGA quality 5 |
+| `OTHER FIX` | Another single-digit GGA quality, not interpreted as RTK |
+| `BLE UP` / `BLE DOWN` | BLE connected / disconnected, not notification subscription or correction reception |
+
+Checksum failures, malformed quality fields, and other NMEA messages do not refresh GGA status.
+Freshness tracking does not depend on serial diagnostics. A new valid GGA replaces the stale indication.
+The OLED does not confirm correction delivery or position accuracy. It adds no data to the BLE stream.
+
+The firmware probes the display at startup. If it is absent, the firmware skips display updates and continues GNSS/BLE operation.
+I2C operations use a five-millisecond driver timeout. Display transfers are synchronous and add loop latency, not a separate task.
+If a later probe fails, updates stop until the ESP32 restarts. Hot-plug recovery is not supported.
+OLED wiring, controller offsets, display appearance, and forwarding throughput with the display require hardware checks.
 
 ## ZED-F9P receiver configuration
 
@@ -101,7 +181,7 @@ Select `esp32-s3-lc29h-da` or `esp32-c3-lc29h-da` for the Quectel LC29H(DA). Oth
 These builds use **115200 baud, 8N1**. They keep the selected ESP32 board's UART pins and BLE service unchanged.
 Connect receiver TX to ESP32 GNSS RX, receiver RX to ESP32 GNSS TX, and connect both grounds.
 Use 3.3 V UART logic. Check the LC29H(DA) carrier's power ratings and connector labels before connection.
-The ZED-F9P photo, power instructions, and connector pinout above do not describe an LC29H(DA) carrier.
+The ZED-F9P power instructions and connector pinout do not describe the LC29H(DA) carrier.
 
 On every ESP32 boot, the firmware waits 1200 ms after UART startup, then sends these command bodies in order:
 
@@ -180,7 +260,7 @@ The monitor shows startup diagnostics, including the free-heap measurement at bo
 sh test/host/run.sh
 ```
 
-The project pins PlatformIO's Espressif32 platform to `~8.0.0`; BLE uses the Arduino ESP32 core's bundled `BLEDevice` GATT API. Host tests cover NMEA checksum/fix parsing, BLE UART batching, and binary RTCM byte-preserving forwarding, including short writes. Receiver tests check baud selection, command bytes, checksums, delays, repeated boots, and write failure without receiver responses. The host tests do not compile or emulate the ESP32 BLE stack.
+The project pins PlatformIO's Espressif32 platform to `~8.0.0`; BLE uses the Arduino ESP32 core's bundled `BLEDevice` GATT API. Host tests cover NMEA checksum/fix parsing, BLE UART batching, and binary RTCM byte-preserving forwarding, including short writes. Status tests cover quality labels, malformed input, freshness boundaries, timer wraparound, and BLE labels. Receiver tests check baud selection, command bytes, checksums, delays, repeated boots, and write failure without receiver responses. The host tests do not compile or emulate the ESP32 BLE stack or OLED hardware.
 
 ## Serial diagnostics
 
@@ -203,7 +283,7 @@ Each second, the console shows BLE connection state, GGA fix quality, sentence c
 
 `[gnss hex]` shows the sample as hexadecimal bytes. `[gnss text]` shows the same bytes, with dots for nonprintable bytes. Samples are partial data, not necessarily complete sentences. The console does not echo the full UART stream.
 
-- If `gnss_rx_bytes` stays zero, check receiver power, shared ground, and `TX1` to the configured GNSS RX pin wiring (GPIO16 on the ESP32-S3 target, GPIO4 on the ESP32-C3 target).
+- If `gnss_rx_bytes` stays zero, check receiver power, shared ground, and receiver TX to GNSS RX wiring (GPIO16 on ESP32-S3, GPIO4 on ESP32-C3).
 - If bytes arrive without valid NMEA, compare the receiver's UART1 baud rate with the startup log.
 - If the text sample is unreadable, check baud rate and signal levels. Binary UBX output can also produce unreadable text.
 - If `nmea` increases but `gga` stays zero, enable GGA output on receiver UART1.
@@ -245,7 +325,7 @@ Check the following with a BLE client and the receiver's own diagnostics:
 | Standalone fix, but no RTK | Correction source, RTCM compatibility, correction age, and UART1 RTCM input settings |
 | `rtcm_bytes` increases, but no RTK | Receiver diagnostics for accepted RTCM messages and the resulting solution |
 
-GGA fix quality normally reports `1` for standalone GNSS, `2` for differential GNSS, `4` for RTK fixed, and `5` for RTK float. The firmware reports the last parsed GGA value. It does not detect a stale fix after NMEA stops.
+GGA fix quality normally reports `1` for standalone GNSS, `2` for differential GNSS, `4` for RTK fixed, and `5` for RTK float. Serial diagnostics report the last parsed GGA value, which can be stale. The optional OLED marks GGA status stale after five seconds without a valid update.
 
 `rtcm_bytes` counts bytes accepted into the ESP32 correction buffer. It does not confirm delivery to the receiver or successful RTCM decoding. The firmware does not validate RTCM framing or guarantee RTK operation.
 
