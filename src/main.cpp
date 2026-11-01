@@ -7,12 +7,16 @@
 #include "ble_uart.h"
 #include "config.h"
 #include "nmea.h"
+#include "oled.h"
+#include "rover_status.h"
 #include "rtcm.h"
 
 namespace {
 HardwareSerial gnss(1);
 BLECharacteristic* txCharacteristic = nullptr;
 NmeaStats nmeaStats;
+bool haveGga = false;
+uint32_t lastGgaMs = 0;
 bool bleConnected = false;
 unsigned long rtcmBytes = 0;
 unsigned long lastStatusMs = 0;
@@ -122,6 +126,9 @@ void setup() {
                               : "[gnss] Startup command write failed. Check receiver configuration.");
   }
   startBle();
+#ifdef ENABLE_OLED
+  startOled();
+#endif
   Serial.printf("GNSS BLE rover started; free heap=%lu bytes\n", static_cast<unsigned long>(ESP.getFreeHeap()));
 }
 
@@ -150,7 +157,10 @@ void loop() {
         }
       }
       portENTER_CRITICAL(&sharedMux);
-      consumeNmeaByte(byte, nmeaStats);
+      if (consumeNmeaByte(byte, nmeaStats)) {
+        haveGga = true;
+        lastGgaMs = millis();
+      }
       const bool connected = bleConnected;
       portEXIT_CRITICAL(&sharedMux);
       if (connected && txCharacteristic != nullptr) {
@@ -172,6 +182,9 @@ void loop() {
   if (now - lastStatusMs >= 1000) {
     lastStatusMs = now;
     publishStatus();
+#ifdef ENABLE_OLED
+    updateOled(fixStatusLabel(haveGga, lastGgaMs, now, nmeaStats.fixQuality), connected);
+#endif
   }
   delay(1);
 }

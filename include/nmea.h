@@ -9,5 +9,5 @@ struct NmeaStats {
   unsigned long fixQuality = 0;
 };
 
-// Consumes a byte stream and updates counters for complete NMEA sentences.
-void consumeNmeaByte(char byte, NmeaStats& stats);
+// Returns true only when a complete, checksum-valid GGA updates fix quality.
+bool consumeNmeaByte(char byte, NmeaStats& stats);

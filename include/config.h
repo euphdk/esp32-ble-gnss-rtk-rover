@@ -26,4 +26,12 @@ constexpr char kUartRxUuid[] = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 constexpr char kUartTxUuid[] = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
 constexpr size_t kRtcmChunkSize = 200;
 constexpr size_t kRtcmBufferSize = 2048;
+#ifdef ENABLE_OLED
+constexpr int kOledSdaPin = OLED_SDA_PIN;
+constexpr int kOledSclPin = OLED_SCL_PIN;
+constexpr uint8_t kOledAddress = 0x3c;
+static_assert(kOledSdaPin != kGnssRxPin && kOledSdaPin != kGnssTxPin &&
+              kOledSclPin != kGnssRxPin && kOledSclPin != kGnssTxPin &&
+              kOledSdaPin != kOledSclPin, "OLED and GNSS pins must be separate");
+#endif
 }
