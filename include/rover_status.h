@@ -8,17 +8,21 @@ constexpr uint32_t kGstStaleMs = 5000;
 constexpr uint32_t kBleOverlayMs = 5000;
 
 inline const char* fixStatusLabel(bool haveGga, uint32_t lastGgaMs, uint32_t now,
-                                  unsigned long quality) {
+                                  unsigned long quality, bool correctionsStale = false) {
   if (!haveGga) return "NO GGA";
   if (static_cast<uint32_t>(now - lastGgaMs) >= kGgaStaleMs) return "GGA STALE";
   switch (quality) {
     case 0: return "NO FIX";
     case 1: return "GNSS";
     case 2: return "DGPS";
-    case 4: return "RTK FIX";
+    case 4: return correctionsStale ? "RTK FIX (!)" : "RTK FIX";
     case 5: return "RTK FLOAT";
     default: return "OTHER FIX";
   }
+}
+
+inline bool correctionDataStale(uint32_t lastCorrectionMs, uint32_t now, uint32_t timeoutMs) {
+  return static_cast<uint32_t>(now - lastCorrectionMs) >= timeoutMs;
 }
 
 inline const char* bleStatusLabel(bool connected) {

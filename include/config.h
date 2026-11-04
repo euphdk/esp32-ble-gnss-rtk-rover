@@ -26,6 +26,7 @@ constexpr char kUartRxUuid[] = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 constexpr char kUartTxUuid[] = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
 constexpr size_t kRtcmChunkSize = 200;
 constexpr size_t kRtcmBufferSize = 2048;
+constexpr uint32_t kCorrectionStaleMs = 10000;
 #ifdef ENABLE_OLED
 constexpr int kOledSdaPin = OLED_SDA_PIN;
 constexpr int kOledSclPin = OLED_SCL_PIN;

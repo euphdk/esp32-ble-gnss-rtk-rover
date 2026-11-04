@@ -56,6 +56,7 @@ Booting without a BLE connection does not trigger an overlay.
 | `GNSS` | GGA quality 1 |
 | `DGPS` | GGA quality 2 |
 | `RTK FIX` | GGA quality 4 |
+| `RTK FIX (!)` | GGA quality 4, but no correction payload accepted over BLE within the configured timeout |
 | `RTK FLOAT` | GGA quality 5 |
 | `OTHER FIX` | Another single-digit GGA quality, not interpreted as RTK |
 | `BLE UP` / `BLE DOWN` | Five-second connection/disconnection overlay, not notification subscription or correction reception |
@@ -65,6 +66,16 @@ Freshness tracking does not depend on serial diagnostics. A new valid GGA replac
 The OLED does not confirm correction delivery or position accuracy. It adds no data to the BLE stream.
 Only checksum-valid GST sentences with finite, nonnegative latitude, longitude, and altitude deviations update the accuracy values.
 Malformed GST does not replace the last valid values or refresh their age.
+
+### Stale correction warning
+
+`config::kCorrectionStaleMs` in `include/config.h` sets the correction timeout in milliseconds. The default is `10000` (10 seconds).
+When GGA still reports RTK FIX after this timeout, the display appends a smaller `(!)` on the same line.
+Other fix labels remain unchanged. Missing or stale GGA takes priority over this warning.
+
+Each non-empty BLE RX payload accepted into the correction buffer restarts the timer. Empty or rejected writes do not refresh it.
+Before any correction payload arrives, the timer runs from ESP32 boot. New data clears the warning on the next display update.
+This measures incoming data activity, not the age of the correction content or successful use by the receiver.
 
 ## Failure behavior and checks
 

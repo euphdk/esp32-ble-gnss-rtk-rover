@@ -25,6 +25,7 @@ uint32_t lastGgaMs = 0;
 uint32_t lastGstMs = 0;
 bool bleConnected = false;
 unsigned long rtcmBytes = 0;
+uint32_t lastCorrectionMs = 0;
 unsigned long lastStatusMs = 0;
 unsigned long gnssBytes = 0;
 unsigned long lastGnssMs = 0;
@@ -59,8 +60,11 @@ class RtcmCallbacks final : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* characteristic) override {
     const String value = characteristic->getValue();
     portENTER_CRITICAL(&sharedMux);
-    if (rtcmBuffer.enqueue(reinterpret_cast<const uint8_t*>(value.c_str()), value.length()))
+    if (value.length() > 0 &&
+        rtcmBuffer.enqueue(reinterpret_cast<const uint8_t*>(value.c_str()), value.length())) {
       rtcmBytes += value.length();
+      lastCorrectionMs = millis();
+    }
     portEXIT_CRITICAL(&sharedMux);
   }
 };
@@ -231,6 +235,9 @@ void loop() {
   }
   portENTER_CRITICAL(&sharedMux);
   const bool connected = bleConnected;
+#ifdef ENABLE_OLED
+  const uint32_t correctionMs = lastCorrectionMs;
+#endif
   portEXIT_CRITICAL(&sharedMux);
   const unsigned long now = millis();
   if (!connected) {
@@ -242,7 +249,9 @@ void loop() {
     lastStatusMs = now;
     publishStatus();
 #ifdef ENABLE_OLED
-    updateOled(fixStatusLabel(haveGga, lastGgaMs, now, nmeaStats.fixQuality), connected,
+    const bool staleCorrections = correctionDataStale(correctionMs, now, config::kCorrectionStaleMs);
+    updateOled(fixStatusLabel(haveGga, lastGgaMs, now, nmeaStats.fixQuality,
+                              staleCorrections), connected,
                gstAccuracyFresh(nmeaStats.gstSentences > 0, lastGstMs, now),
                nmeaStats.horizontalAccuracy, nmeaStats.verticalAccuracy);
 #endif

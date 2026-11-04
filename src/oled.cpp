@@ -3,6 +3,7 @@
 #ifdef ENABLE_OLED
 #include <Adafruit_SSD1306.h>
 #include <Wire.h>
+#include <string.h>
 
 #include "config.h"
 #include "rover_status.h"
@@ -37,7 +38,16 @@ void updateOled(const char* fixLabel, bool connected, bool haveAccuracy,
   }
   display.clearDisplay();
   display.setCursor(0, 8);
-  display.print(fixLabel);
+  const char* warning = strstr(fixLabel, " (!)");
+  if (warning != nullptr) {
+    for (const char* p = fixLabel; p < warning; ++p) display.write(*p);
+    display.setCursor(display.getCursorX(), 12);
+    display.setTextSize(1);
+    display.print(warning);
+    display.setTextSize(2);
+  } else {
+    display.print(fixLabel);
+  }
   const char* bleLabel = bleOverlay.update(connected, millis());
   if (bleLabel != nullptr) {
     display.setCursor(0, 40);

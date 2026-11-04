@@ -46,6 +46,21 @@ int main() {
   assert(strcmp(fixStatusLabel(true, UINT32_MAX - 999, 4000, 5), "GGA STALE") == 0);
   assert(strcmp(fixStatusLabel(true, 5000, 5001, 4), "RTK FIX") == 0);
   assert(strcmp(fixStatusLabel(true, 0, 1, 999), "OTHER FIX") == 0);
+  assert(strcmp(fixStatusLabel(true, 100, 101, 4, true), "RTK FIX (!)") == 0);
+  assert(strcmp(fixStatusLabel(true, 100, 101, 4, false), "RTK FIX") == 0);
+  assert(strcmp(fixStatusLabel(true, 100, 101, 5, true), "RTK FLOAT") == 0);
+  assert(strcmp(fixStatusLabel(true, 100, 101, 1, true), "GNSS") == 0);
+  assert(strcmp(fixStatusLabel(true, 100, 5100, 4, true), "GGA STALE") == 0);
+  assert(strcmp(fixStatusLabel(false, 0, 0, 4, true), "NO GGA") == 0);
+  assert(!correctionDataStale(0, 9999, 10000));
+  assert(correctionDataStale(0, 10000, 10000));
+  assert(!correctionDataStale(100, 10099, 10000));
+  assert(correctionDataStale(100, 10100, 10000));
+  assert(!correctionDataStale(10100, 10101, 10000));
+  assert(!correctionDataStale(100, 1099, 1000));
+  assert(correctionDataStale(100, 1100, 1000));
+  assert(!correctionDataStale(UINT32_MAX - 999, 8999, 10000));
+  assert(correctionDataStale(UINT32_MAX - 999, 9000, 10000));
   assert(strcmp(bleStatusLabel(true), "BLE UP") == 0);
   assert(strcmp(bleStatusLabel(false), "BLE DOWN") == 0);
 
