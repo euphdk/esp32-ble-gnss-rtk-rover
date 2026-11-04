@@ -232,6 +232,7 @@ The ZED-F9P power instructions and connector pinout do not describe the LC29H(DA
 On every ESP32 boot, the firmware waits 1200 ms after UART startup, then sends these command bodies in order:
 
 ```text
+PQTMVERNO
 PQTMCFGRCVRMODE,W,1
 PQTMCFGRTK,W,1,1
 PQTMCFGPROT,W,1,1,00000005,00000005
@@ -239,19 +240,28 @@ PQTMCFGMSGRATE,W,GGA,1
 PQTMCFGMSGRATE,W,RMC,1
 PQTMCFGMSGRATE,W,GSA,1
 PQTMCFGMSGRATE,W,GSV,1
+PQTMCFGMSGRATE,W,GST,1
 PQTMCFGMSGRATE,W,VTG,0
 PQTMCFGMSGRATE,W,GLL,0
 PQTMCFGMSGRATE,W,ZDA,0
 ```
 
 Each command uses `$body*XX\r\n` framing. `XX` is the two-digit hexadecimal XOR checksum of the body.
-The firmware waits 250 ms between commands. BLE starts after this sequence, approximately 3.45 seconds after UART startup.
-These commands match the supplied LC29H(DA) reference project. The firmware sends them again because they are not persisted.
-There are no acknowledgment waits or retries. A short UART write stops setup and prints a console error, but BLE still starts.
-The success log confirms writes only, not receiver acceptance. Power the receiver before resetting the ESP32.
+The firmware waits 250 ms between commands and for 250 ms after the last command.
+BLE starts after this sequence, approximately 4.20 seconds after UART startup.
+During these waits, the firmware drains receiver UART bytes and prints them to the serial console if serial diagnostics are enabled.
+`PQTMVERNO` requests the firmware version. The configuration commands come from the supplied LC29H(DA) reference project.
+The firmware sends them again because they are not persisted.
+The firmware does not validate replies or retry commands. A short UART write stops setup and prints a console error, but BLE still starts.
+The success log confirms writes only, not receiver acceptance. Inspect the startup replies for acceptance or errors.
+If the version query produces no reply, check the ESP32 TX connection to the receiver's command RX input and carrier UART routing.
+Power the receiver before resetting the ESP32.
 After a receiver-only reset, reset the ESP32 to send the commands again.
 
-This message set enables GGA, RMC, GSA, and GSV. It does not configure GST or promise SW Maps accuracy fields.
+This message set requests GGA, RMC, GSA, GSV, and GST once per navigation cycle.
+GST support depends on receiver firmware. Check for `$GNGST` or `$GPGST` output and the accuracy fields in SW Maps.
+Verified on firmware `LC29HDANR11A05S_RSA` (2026/07/01): the GST command returns `OK`, and the receiver outputs `$GNGST`.
+The ZED-F9P `CFG-MSGOUT-NMEA_ID_GST_UART1` setting does not apply to the LC29H(DA).
 The bridge still forwards all receiver bytes, including command responses, without filtering.
 Supply RTCM corrections through the BLE client. The firmware adds no Wi-Fi or NTRIP client.
 LC29H(DA) command acceptance, RTK operation, and BLE interoperability require hardware checks.
@@ -291,7 +301,10 @@ ESP32-S3: use the board's USB-to-UART connector for upload and diagnostic output
 
 ESP32-C3 SuperMini: the board exposes only its native USB connection, without a USB-to-UART bridge. The `esp32-c3` build enables the USB CDC console (`ARDUINO_USB_CDC_ON_BOOT=1`, `ARDUINO_USB_MODE=1`), so `Serial` output appears on the board's USB port at 115200 baud. Upload and monitor through that same port. Many SuperMini clones do not enter the bootloader automatically; if the upload times out, press the `BOOT`/`GPIO9` button while resetting or plugging in the board. The CDC port disappears while the board is in the bootloader or resetting, so the port name can change between phases. These port behaviors are not verified on hardware.
 
-If multiple serial devices appear, use PlatformIO directly to select the ESP32 port:
+The `esp32-c3-lc29h-da` environment sets `upload_port` and `monitor_port` to `/dev/tty.usbmodem12301` to avoid automatic selection of another device.
+Change these settings in `platformio.ini` if the port changes, or override them with `--upload-port` and `--port`, respectively.
+
+For other environments, or to override the configured port, use PlatformIO directly:
 
 ```sh
 pio run -e esp32-s3 -t upload --upload-port /path/to/esp32-port
@@ -329,6 +342,10 @@ Each second, the console shows BLE connection state, GGA fix quality, sentence c
 
 `[gnss hex]` shows the sample as hexadecimal bytes. `[gnss text]` shows the same bytes, with dots for nonprintable bytes. Samples are partial data, not necessarily complete sentences. The console does not echo the full UART stream.
 
+`[ble tx] errors` counts rejected notification attempts, including attempts before subscription. `last_code` shows the latest rejection code.
+On the ESP32-C3 NimBLE stack, code `6` means transmit-buffer exhaustion. Rejected chunks remain buffered for retry.
+`[ble buffers]` shows free NimBLE packet buffers and free heap to help diagnose stalls.
+
 - If `gnss_rx_bytes` stays zero, check receiver power, shared ground, and receiver TX to GNSS RX wiring (GPIO16 on ESP32-S3, GPIO4 on ESP32-C3).
 - If bytes arrive without valid NMEA, compare the receiver's UART1 baud rate with the startup log.
 - If the text sample is unreadable, check baud rate and signal levels. Binary UBX output can also produce unreadable text.
@@ -344,7 +361,11 @@ Set `kSerialDebug` to `false` and rebuild to disable periodic console diagnostic
 Service UUID: `6e400001-b5a3-f393-e0a9-e50e24dcca9e` (Nordic-UART-style UUIDs).
 
 * RX `6e400002-b5a3-f393-e0a9-e50e24dcca9e`: write or write-without-response. Each write payload is forwarded unchanged to GNSS UART; payloads are treated as opaque binary (not UTF-8 or NMEA).
-* TX `6e400003-b5a3-f393-e0a9-e50e24dcca9e`: notifications/read. Receiver UART bytes use chunks of up to 20 bytes, compatible with the default ATT MTU of 23 bytes. Full chunks send immediately. After each UART drain, a partial chunk sends if at least 20 ms have elapsed since the previous notification. Concatenate notifications to reconstruct the stream, including original CR/LF sentence endings. A notification can contain part of a sentence or cross a sentence boundary. Reads return the latest chunk, not a complete sentence or history. No diagnostic status text is inserted into this stream.
+* TX `6e400003-b5a3-f393-e0a9-e50e24dcca9e`: notifications/read. Receiver UART bytes use chunks of up to 20 bytes, compatible with the default ATT MTU of 23 bytes. Full chunks send with at least five milliseconds between notification attempts. After each UART drain, a partial chunk sends if at least 20 ms have elapsed since the previous notification attempt. Concatenate notifications to reconstruct the stream, including original CR/LF sentence endings. A notification can contain part of a sentence or cross a sentence boundary. Reads return the latest chunk, not a complete sentence or history. No diagnostic status text is inserted into this stream.
+
+If BLE rejects a chunk, the bridge retains it and pauses UART reads until BLE accepts it.
+A 4096-byte UART receive buffer absorbs receiver bursts during these pauses.
+Sustained congestion can still overflow that buffer. Disconnecting clears the pending BLE chunk.
 
 Use the configuration for [ZED-F9P](#zed-f9p-receiver-configuration) or [LC29H(DA)](#lc29hda-receiver-configuration) above. The bridge does not filter binary output or change talker IDs. It does not replay bytes received while disconnected or guarantee notification delivery. Batching reduces notification overhead, but SW Maps interoperability still requires a hardware check.
 
@@ -357,7 +378,10 @@ Use the configuration for [ZED-F9P](#zed-f9p-receiver-configuration) or [LC29H(D
 
 For satellite and accuracy displays, use the NMEA message settings in [receiver configuration](#zed-f9p-receiver-configuration).
 
-The user confirmed valid SW Maps positioning with the batched NMEA stream. Accuracy fields, NTRIP corrections, and RTK operation still require hardware checks.
+The user confirmed valid SW Maps positioning, incoming corrections, and RTK FLOAT operation. RTK FIX and long-duration reliability still require hardware checks.
+With paced notifications, the user confirmed live accuracy fields and continuous updates in iOS SW Maps after reconnecting.
+If SW Maps remains connected but stops updating, disconnect and reconnect before restarting the rover.
+ArduSimple's [BT+BLE Bridge guide](https://www.ardusimple.com/btble-bridge-hookup-guide/) also notes that the first connection after power-up can require two connection attempts.
 
 ## Receiver checks and limitations
 

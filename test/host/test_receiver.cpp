@@ -29,6 +29,7 @@ int main() {
 #if GNSS_RECEIVER == GNSS_RECEIVER_LC29H_DA
   static_assert(config::kGnssBaud == 115200);
   const std::vector<std::string> expected = {
+      "$PQTMVERNO*58\r\n",
       "$PQTMCFGRCVRMODE,W,1*2A\r\n",
       "$PQTMCFGRTK,W,1,1*6C\r\n",
       "$PQTMCFGPROT,W,1,1,00000005,00000005*38\r\n",
@@ -36,17 +37,18 @@ int main() {
       "$PQTMCFGMSGRATE,W,RMC,1*17\r\n",
       "$PQTMCFGMSGRATE,W,GSA,1*1E\r\n",
       "$PQTMCFGMSGRATE,W,GSV,1*09\r\n",
+      "$PQTMCFGMSGRATE,W,GST,1*0B\r\n",
       "$PQTMCFGMSGRATE,W,VTG,0*0F\r\n",
       "$PQTMCFGMSGRATE,W,GLL,0*0D\r\n",
       "$PQTMCFGMSGRATE,W,ZDA,0*15\r\n",
   };
   assert(writer.frames == expected);
-  assert(waits.size() == 10);
+  assert(waits.size() == expected.size());
   for (size_t i = 0; i < expected.size(); ++i) {
     assert(writer.times[i] == 1200 + i * 250);
     assert(waits[i] == (i == 0 ? 1200 : 250));
   }
-  assert(writer.now == 3450);
+  assert(writer.now == 3950);
   // A new boot sends the complete sequence again, without an acknowledgment source.
   ReceiverWriter reboot;
   assert(configureGnss(reboot, [&](uint32_t ms) { reboot.now += ms; }));

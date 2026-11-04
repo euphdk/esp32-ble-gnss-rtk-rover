@@ -3,6 +3,9 @@
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
+#if defined(CONFIG_NIMBLE_ENABLED)
+#include <os/os_mbuf.h>
+#endif
 
 #include "ble_uart.h"
 #include "config.h"
@@ -24,6 +27,10 @@ unsigned long gnssBytes = 0;
 unsigned long lastGnssMs = 0;
 unsigned long bleNmeaNotifyCalls = 0;
 unsigned long lastNmeaNotifyMs = 0;
+bool lastNotifyAccepted = false;
+TaskHandle_t notifyTask = nullptr;
+unsigned long bleNotifyErrors = 0;
+uint32_t lastBleNotifyError = 0;
 BleUartBatch nmeaBatch;
 uint8_t gnssSample[64];
 size_t gnssSampleLength = 0;
@@ -55,6 +62,19 @@ class RtcmCallbacks final : public BLECharacteristicCallbacks {
   }
 };
 
+class TxCallbacks final : public BLECharacteristicCallbacks {
+ public:
+  void onStatus(BLECharacteristic*, Status status, uint32_t code) override {
+    // Only the synchronous callback reports whether notify() accepted this chunk.
+    if (xTaskGetCurrentTaskHandle() != notifyTask) return;
+    lastNotifyAccepted = status == Status::SUCCESS_NOTIFY;
+    if (!lastNotifyAccepted) {
+      ++bleNotifyErrors;
+      lastBleNotifyError = code;
+    }
+  }
+};
+
 void startBle() {
   BLEDevice::init(config::kDeviceName);
   BLEServer* server = BLEDevice::createServer();
@@ -65,6 +85,7 @@ void startBle() {
   rx->setCallbacks(new RtcmCallbacks());
   txCharacteristic = service->createCharacteristic(
       config::kUartTxUuid, BLECharacteristic::PROPERTY_NOTIFY | BLECharacteristic::PROPERTY_READ);
+  txCharacteristic->setCallbacks(new TxCallbacks());
   txCharacteristic->addDescriptor(new BLE2902());
   service->start();
   BLEAdvertising* advertising = BLEDevice::getAdvertising();
@@ -89,6 +110,12 @@ void publishStatus() {
   if (config::kSerialDebug) {
     Serial.printf("[debug] %s,nmea=%lu,gnss_rx_bytes=%lu,ble_nmea_notify_calls=%lu\n",
                   status, stats.sentences, gnssBytes, bleNmeaNotifyCalls);
+    Serial.printf("[ble tx] errors=%lu,last_code=%lu\n", bleNotifyErrors,
+                  static_cast<unsigned long>(lastBleNotifyError));
+#if defined(CONFIG_NIMBLE_ENABLED)
+    Serial.printf("[ble buffers] free=%d,heap=%lu\n", os_msys_num_free(),
+                  static_cast<unsigned long>(ESP.getFreeHeap()));
+#endif
     if (gnssBytes == 0) {
       Serial.printf("[gnss] No UART bytes received. Check power, GND, TX1 -> GPIO%d, and baud rate.\n",
                     config::kGnssRxPin);
@@ -113,6 +140,8 @@ void publishStatus() {
 
 void setup() {
   Serial.begin(config::kConsoleBaud);
+  notifyTask = xTaskGetCurrentTaskHandle();
+  gnss.setRxBufferSize(4096);
   gnss.begin(config::kGnssBaud, SERIAL_8N1, config::kGnssRxPin, config::kGnssTxPin);
   if (config::kSerialDebug) {
     Serial.printf("[gnss] receiver=%s,UART1 baud=%lu,8N1,rx_gpio=%d,tx_gpio=%d\n",
@@ -120,8 +149,19 @@ void setup() {
                   static_cast<unsigned long>(config::kGnssBaud),
                   config::kGnssRxPin, config::kGnssTxPin);
   }
-  const bool configured = configureGnss(gnss, [](uint32_t ms) { delay(ms); });
+  auto waitForGnss = [](uint32_t ms) {
+    const uint32_t start = millis();
+    while (millis() - start < ms) {
+      while (gnss.available() > 0) {
+        const int byte = gnss.read();
+        if (byte >= 0 && config::kSerialDebug) Serial.write(static_cast<uint8_t>(byte));
+      }
+      delay(1);
+    }
+  };
+  const bool configured = configureGnss(gnss, waitForGnss);
   if (config::kLc29hDa) {
+    waitForGnss(250);
     Serial.println(configured ? "[gnss] Startup commands sent (not acknowledged)"
                               : "[gnss] Startup command write failed. Check receiver configuration.");
   }
@@ -134,10 +174,13 @@ void setup() {
 
 void loop() {
   auto notifyNmea = [](const uint8_t* data, size_t length) {
+    if (millis() - lastNmeaNotifyMs < 5) return false;
+    lastNotifyAccepted = false;
     txCharacteristic->setValue(data, length);
     txCharacteristic->notify();
     lastNmeaNotifyMs = millis();
     if (config::kSerialDebug) ++bleNmeaNotifyCalls;
+    return lastNotifyAccepted;
   };
   uint8_t chunk[config::kRtcmChunkSize];
   size_t chunkLength;
@@ -146,6 +189,8 @@ void loop() {
   portEXIT_CRITICAL(&sharedMux);
   if (chunkLength > 0) gnss.write(chunk, chunkLength);
   while (gnss.available() > 0) {
+    if (nmeaBatch.full() &&
+        (millis() - lastNmeaNotifyMs < 5 || !nmeaBatch.flush(notifyNmea))) break;
     const int value = gnss.read();
     if (value >= 0) {
       char byte = static_cast<char>(value);

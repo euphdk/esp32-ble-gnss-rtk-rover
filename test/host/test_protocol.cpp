@@ -30,6 +30,7 @@ int main() {
     assert(length > 0 && length <= BleUartBatch::kPayloadSize);
     bleOutput.append(reinterpret_cast<const char*>(data), length);
     notificationSizes.push_back(length);
+    return true;
   };
   batch.flush(notify);
   assert(notificationSizes.empty());
@@ -51,6 +52,45 @@ int main() {
   batch.append('Y', notify);
   batch.flush(notify);
   assert(bleOutput == stream + std::string(40, 'A') + 'Y');
+
+  BleUartBatch congested;
+  bool ready = false;
+  std::string delivered;
+  auto retryNotify = [&](const uint8_t* data, size_t length) {
+    if (!ready) return false;
+    delivered.append(reinterpret_cast<const char*>(data), length);
+    return true;
+  };
+  const std::string gst = "$GNGST,155357.000,3.703,3.644,1.272,86.348,3.637,1.291,6.764*45\r\n";
+  for (size_t i = 0; i < BleUartBatch::kPayloadSize; ++i) {
+    assert(congested.append(static_cast<uint8_t>(gst[i]), retryNotify));
+  }
+  assert(congested.full());
+  assert(!congested.flush(retryNotify));
+  assert(!congested.append(static_cast<uint8_t>(gst[20]), retryNotify));
+  assert(delivered.empty());
+  ready = true;
+  assert(congested.flush(retryNotify));
+  for (size_t i = 20; i < gst.size(); ++i) {
+    assert(congested.append(static_cast<uint8_t>(gst[i]), retryNotify));
+  }
+  ready = false;
+  assert(!congested.flush(retryNotify));
+  ready = true;
+  assert(congested.flush(retryNotify));
+  assert(delivered == gst);
+
+  ready = false;
+  for (size_t i = 0; i < BleUartBatch::kPayloadSize; ++i) {
+    assert(congested.append('X', retryNotify));
+  }
+  congested.clear();
+  ready = true;
+  assert(congested.append('Y', retryNotify));
+  assert(congested.flush(retryNotify));
+  assert(delivered == gst + 'Y');
+  assert(congested.flush(retryNotify));
+  assert(delivered == gst + 'Y');
 
   const uint8_t binary[] = {0xd3, 0x00, 0x13, 0x00, 0xff, 0x80};
   ShortWriter writer;

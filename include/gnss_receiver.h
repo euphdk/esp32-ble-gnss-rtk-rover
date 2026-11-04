@@ -26,6 +26,7 @@ bool configureGnss(Writer& uart, Wait wait) {
   if constexpr (!config::kLc29hDa) return true;
 
   constexpr const char* commands[] = {
+      "PQTMVERNO",
       "PQTMCFGRCVRMODE,W,1",
       "PQTMCFGRTK,W,1,1",
       "PQTMCFGPROT,W,1,1,00000005,00000005",
@@ -33,6 +34,7 @@ bool configureGnss(Writer& uart, Wait wait) {
       "PQTMCFGMSGRATE,W,RMC,1",
       "PQTMCFGMSGRATE,W,GSA,1",
       "PQTMCFGMSGRATE,W,GSV,1",
+      "PQTMCFGMSGRATE,W,GST,1",
       "PQTMCFGMSGRATE,W,VTG,0",
       "PQTMCFGMSGRATE,W,GLL,0",
       "PQTMCFGMSGRATE,W,ZDA,0",

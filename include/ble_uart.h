@@ -9,17 +9,22 @@ class BleUartBatch {
   static constexpr size_t kPayloadSize = 20;
 
   template <typename Sender>
-  void append(uint8_t byte, Sender& send) {
+  bool append(uint8_t byte, Sender& send) {
+    if (full() && !flush(send)) return false;
     bytes_[size_++] = byte;
     if (size_ == sizeof(bytes_)) flush(send);
+    return true;
   }
 
   template <typename Sender>
-  void flush(Sender& send) {
-    if (size_ == 0) return;
-    send(bytes_, size_);
+  bool flush(Sender& send) {
+    if (size_ == 0) return true;
+    if (!send(bytes_, size_)) return false;
     clear();
+    return true;
   }
+
+  bool full() const { return size_ == sizeof(bytes_); }
 
   void clear() { size_ = 0; }
 
