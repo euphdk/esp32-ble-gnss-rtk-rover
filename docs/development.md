@@ -9,7 +9,8 @@ The project pins PlatformIO's Espressif32 platform to `~8.0.0`.
 BLE uses the Arduino ESP32 core's bundled `BLEDevice` GATT API.
 
 The final hardware target uses **`esp32-c3-lc29h-da-oled`**.
-The current Make and PlatformIO defaults remain `esp32-s3`. Always specify `ENV` when building the final hardware target.
+Make defaults to `esp32-c3-lc29h-da-oled`. Override it with `ENV` for other hardware.
+Direct PlatformIO commands still default to `esp32-s3` unless you specify `-e`.
 
 | Environment | ESP32 board | Receiver | OLED |
 | --- | --- | --- | --- |
@@ -30,21 +31,21 @@ Custom environments can set `-DGNSS_RECEIVER=GNSS_RECEIVER_LC29H_DA`. Unsupporte
 
 ## Commands
 
-`make` defaults to `make build` for the ESP32-S3 target. Select another target with `ENV`:
+`make` defaults to `make build` for the C3 + LC29H(DA) + OLED target:
 
 ```sh
 make test
-make build ENV=esp32-c3-lc29h-da-oled
-make upload ENV=esp32-c3-lc29h-da-oled
-make monitor ENV=esp32-c3-lc29h-da-oled
+make build
+make upload
+make monitor
 ```
 
 Use the same environment for build, upload, and monitor. Other supported examples:
 
 ```sh
-make build
-make upload
-make monitor
+make build ENV=esp32-s3
+make upload ENV=esp32-s3
+make monitor ENV=esp32-s3
 
 make build ENV=esp32-c3
 make upload ENV=esp32-c3

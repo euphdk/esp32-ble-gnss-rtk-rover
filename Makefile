@@ -1,6 +1,6 @@
 .PHONY: build test upload monitor
 
-ENV ?= esp32-s3
+ENV ?= esp32-c3-lc29h-da-oled
 
 build:
 	pio run -e $(ENV)

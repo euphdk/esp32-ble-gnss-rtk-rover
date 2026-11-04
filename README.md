@@ -25,11 +25,11 @@ See [hardware details](docs/hardware.md) and the [battery power plan](docs/batte
 ## Build and upload
 
 Install Make and PlatformIO Core. Host tests also need a C++17 compiler.
-Use **`esp32-c3-lc29h-da-oled`** explicitly; the project defaults still select the ESP32-S3.
+Make defaults to **`esp32-c3-lc29h-da-oled`**. Override it with `ENV` for other hardware.
 
 ```sh
 make test
-make build ENV=esp32-c3-lc29h-da-oled
+make build
 pio run -e esp32-c3-lc29h-da-oled -t upload --upload-port /dev/tty.usbmodem12301
 pio device monitor -e esp32-c3-lc29h-da-oled --port /dev/tty.usbmodem12301
 ```

@@ -57,7 +57,7 @@ Check any carrier USB/UART switches as well.
 
 ### ZED-F9P
 
-| White six-pin connector | ESP32-C3 (`esp32-c3`) | ESP32-S3 (`esp32-s3`, current default) |
+| White six-pin connector | ESP32-C3 (`esp32-c3`) | ESP32-S3 (`esp32-s3`) |
 | --- | --- | --- |
 | TX1 | GPIO4 (GNSS RX) | GPIO16 (GNSS RX) |
 | RX1 | GPIO5 (GNSS TX) | GPIO17 (GNSS TX) |
