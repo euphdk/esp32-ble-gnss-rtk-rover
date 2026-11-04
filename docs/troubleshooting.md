@@ -31,8 +31,13 @@ They do not establish that RTK corrections are active.
 
 ### Connected, but updates stop
 
-Disconnect and reconnect SW Maps before restarting the rover.
-The user confirmed continuous iOS SW Maps updates after reconnecting with paced notifications.
+If updates resume only while a serial monitor reads the C3 console, check for blocking USB diagnostic writes.
+This caused a confirmed stall: an unread USB console delayed the main loop, which also handles GNSS and BLE forwarding.
+The firmware now sets the native USB console transmit timeout to zero. Unread diagnostics can be dropped instead of delaying forwarding.
+A connected USB cable does not mean a host application is reading the console.
+
+For other connection problems, disconnect and reconnect SW Maps before restarting the rover.
+Reconnection helped during earlier tests, but did not resolve the USB diagnostic stall.
 ArduSimple's [BT+BLE Bridge guide](https://www.ardusimple.com/btble-bridge-hookup-guide/) also notes that the first connection after power-up can require two connection attempts.
 
 Check the serial BLE counters as well. A BLE connection alone does not confirm notification subscription or delivery.
@@ -79,6 +84,7 @@ On the ESP32-C3 NimBLE stack, code `6` means transmit-buffer exhaustion. Rejecte
 
 Set `kSerialDebug` to `false` and rebuild to disable periodic console diagnostics.
 The startup free-heap message remains enabled. Diagnostics do not change the BLE payload format or prove that SW Maps accepts it.
+Native USB console writes are non-blocking. Diagnostic output can be incomplete if the host does not keep up.
 
 ## Receiver checks
 
@@ -107,6 +113,8 @@ The earlier prototype documentation described all receiver hardware as unverifie
 - ESP32-S3 and ESP32-C3 target builds compile, and host protocol tests pass.
 - The user confirmed valid SW Maps positioning, incoming corrections, and RTK FLOAT operation with the C3 and LC29H(DA).
 - The user confirmed live accuracy fields and continuous updates in iOS SW Maps after reconnecting with paced notifications.
+- A later stall depended on the serial monitor: updates resumed while it read the console and stopped after it closed.
+  After the USB transmit timeout changed to zero, the user confirmed continuous updates with all serial monitors closed.
 - A direct Mac BLE capture received approximately 80 KB over 44 seconds with zero invalid NMEA checksums, including 44 GST sentences.
   This capture did not include incoming NTRIP corrections.
 - Serial diagnostics showed receiver traffic and incoming corrections during a 90-second capture. BLE packet buffers recovered rather than remaining exhausted.
@@ -115,3 +123,14 @@ The earlier prototype documentation described all receiver hardware as unverifie
 Remaining hardware checks include RTK FIX, long-duration reliability, sustained BLE throughput, and operation with the OLED attached.
 OLED controller offsets and display appearance also need confirmation.
 The ESP32-S3 build remains unverified against the receiver hardware.
+
+### Monitor-closed regression check
+
+1. Upload the C3 firmware and close all serial monitors.
+2. Keep USB connected, without a host application reading the console.
+3. Connect SW Maps and enable NTRIP corrections.
+4. Check that position, time, and accuracy continue updating for at least a minute.
+5. Open a serial monitor and confirm updates continue.
+6. Close the monitor and repeat the update check.
+
+A test performed only with the monitor open does not cover this failure mode.

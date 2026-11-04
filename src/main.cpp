@@ -140,6 +140,10 @@ void publishStatus() {
 
 void setup() {
   Serial.begin(config::kConsoleBaud);
+#if ARDUINO_USB_CDC_ON_BOOT && ARDUINO_USB_MODE
+  // An attached USB host may stop reading; diagnostics must not block forwarding.
+  Serial.setTxTimeoutMs(0);
+#endif
   notifyTask = xTaskGetCurrentTaskHandle();
   gnss.setRxBufferSize(4096);
   gnss.begin(config::kGnssBaud, SERIAL_8N1, config::kGnssRxPin, config::kGnssTxPin);

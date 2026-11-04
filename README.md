@@ -44,7 +44,7 @@ The firmware sends receiver configuration at startup, including a request for GS
 3. Enable your NTRIP correction source in SW Maps.
 4. Check position updates, accuracy fields, and fix quality.
 
-If updates stop while BLE remains connected, disconnect and reconnect SW Maps before rebooting the rover.
+No serial monitor is required for operation. See [troubleshooting](docs/troubleshooting.md) if updates stop while BLE remains connected.
 Positioning, GST accuracy fields, and RTK FLOAT have been confirmed with the C3 and LC29H(DA).
 The OLED integration, RTK FIX, and long-duration reliability still need hardware checks.
 
