@@ -12,7 +12,7 @@ All targets use BLE, without Bluetooth Classic. USB serial carries diagnostic ou
 
 The supplied photo shows a carrier with a seven-pin header and a small coaxial connector.
 
-![LC29H(DA) receiver board and header labels](../71UH+POQd1L._AC_SL1500_.jpg)
+![LC29H(DA) receiver board and header labels](images/71UH+POQd1L._AC_SL1500_.jpg)
 
 The header labels are `V`, `G`, `T1`, `R1`, `R2`, `T2`, and `P`.
 The photo alone does not establish their functions, voltage ratings, or UART routing.
@@ -22,7 +22,7 @@ Confirm these details with the carrier supplier or schematic before connection.
 
 The supplied photo shows a ZED-F9P-01B-01 module on a board marked `URTK1.2`.
 
-![ZED-F9P receiver board and connector labels](../IMG_0169.jpg)
+![ZED-F9P receiver board and connector labels](images/IMG_0169.jpg)
 
 Use the white six-pin connector labeled `GND`, `NC`, `NC`, `TX1`, `RX1`, and `5V`.
 These labels identify the receiver's UART1 connection. The side header also exposes `TX2` and `RX2` for UART2.
