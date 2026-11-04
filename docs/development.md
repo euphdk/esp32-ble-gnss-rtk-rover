@@ -76,9 +76,9 @@ If upload times out, press `BOOT`/`GPIO9` while resetting or plugging in the boa
 The CDC port can disappear while the board resets or enters the bootloader. Its name can change between phases.
 These behaviors vary by board and have not all been checked on this hardware.
 
-Only `esp32-c3-lc29h-da` currently sets `upload_port` and `monitor_port` to `/dev/tty.usbmodem12301`.
-The OLED environment does **not** inherit these port settings.
-Use explicit ports for the final hardware target to avoid automatic selection of another device:
+Both C3 + LC29H environments use `/dev/tty.usbmodem12301` for upload and monitor.
+The OLED environment references the port settings in `esp32-c3-lc29h-da`, so `make upload` and `make monitor` avoid automatic selection.
+Change those settings in `platformio.ini` if the C3 port changes, or override them explicitly:
 
 ```sh
 pio run -e esp32-c3-lc29h-da-oled -t upload --upload-port /dev/tty.usbmodem12301
