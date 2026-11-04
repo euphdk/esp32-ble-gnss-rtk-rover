@@ -1,8 +1,11 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdio.h>
 
 constexpr uint32_t kGgaStaleMs = 5000;
+constexpr uint32_t kGstStaleMs = 5000;
+constexpr uint32_t kBleOverlayMs = 5000;
 
 inline const char* fixStatusLabel(bool haveGga, uint32_t lastGgaMs, uint32_t now,
                                   unsigned long quality) {
@@ -21,3 +24,35 @@ inline const char* fixStatusLabel(bool haveGga, uint32_t lastGgaMs, uint32_t now
 inline const char* bleStatusLabel(bool connected) {
   return connected ? "BLE UP" : "BLE DOWN";
 }
+
+inline bool gstAccuracyFresh(bool haveGst, uint32_t lastGstMs, uint32_t now) {
+  return haveGst && static_cast<uint32_t>(now - lastGstMs) < kGstStaleMs;
+}
+
+inline void formatAccuracy(char* output, size_t capacity, float meters) {
+  if (meters >= 1) {
+    snprintf(output, capacity, "%.1fm", meters);
+  } else if (meters >= 0.1f) {
+    snprintf(output, capacity, "%.0fcm", meters * 100);
+  } else {
+    snprintf(output, capacity, "%.1fcm", meters * 100);
+  }
+}
+
+class BleStatusOverlay {
+ public:
+  const char* update(bool connected, uint32_t now) {
+    if (connected != connected_) {
+      connected_ = connected;
+      haveEvent_ = true;
+      eventMs_ = now;
+    }
+    if (!haveEvent_ || static_cast<uint32_t>(now - eventMs_) >= kBleOverlayMs) return nullptr;
+    return bleStatusLabel(connected_);
+  }
+
+ private:
+  bool connected_ = false;
+  bool haveEvent_ = false;
+  uint32_t eventMs_ = 0;
+};

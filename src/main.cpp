@@ -20,6 +20,7 @@ BLECharacteristic* txCharacteristic = nullptr;
 NmeaStats nmeaStats;
 bool haveGga = false;
 uint32_t lastGgaMs = 0;
+uint32_t lastGstMs = 0;
 bool bleConnected = false;
 unsigned long rtcmBytes = 0;
 unsigned long lastStatusMs = 0;
@@ -206,10 +207,12 @@ void loop() {
         }
       }
       portENTER_CRITICAL(&sharedMux);
+      const unsigned long previousGstSentences = nmeaStats.gstSentences;
       if (consumeNmeaByte(byte, nmeaStats)) {
         haveGga = true;
         lastGgaMs = millis();
       }
+      if (nmeaStats.gstSentences != previousGstSentences) lastGstMs = millis();
       const bool connected = bleConnected;
       portEXIT_CRITICAL(&sharedMux);
       if (connected && txCharacteristic != nullptr) {
@@ -232,7 +235,9 @@ void loop() {
     lastStatusMs = now;
     publishStatus();
 #ifdef ENABLE_OLED
-    updateOled(fixStatusLabel(haveGga, lastGgaMs, now, nmeaStats.fixQuality), connected);
+    updateOled(fixStatusLabel(haveGga, lastGgaMs, now, nmeaStats.fixQuality), connected,
+               gstAccuracyFresh(nmeaStats.gstSentences > 0, lastGstMs, now),
+               nmeaStats.horizontalAccuracy, nmeaStats.verticalAccuracy);
 #endif
   }
   delay(1);

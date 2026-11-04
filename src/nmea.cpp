@@ -1,6 +1,8 @@
 #include "nmea.h"
 
+#include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 namespace {
@@ -23,6 +25,25 @@ bool parseLine(NmeaStats& stats) {
   }
 
   ++stats.sentences;
+  if (strncmp(line + 3, "GST,", 4) == 0) {
+    char* field = strchr(line, ',');
+    for (int i = 0; i < 5 && field != nullptr; ++i) field = strchr(field + 1, ',');
+    float deviations[3];
+    for (int i = 0; i < 3; ++i) {
+      if (field == nullptr || field >= star) return false;
+      char* end;
+      deviations[i] = strtof(field + 1, &end);
+      if (end == field + 1 || *end != (i < 2 ? ',' : '*') ||
+          !isfinite(deviations[i]) || deviations[i] < 0) return false;
+      field = end;
+    }
+    const float horizontal = hypotf(deviations[0], deviations[1]);
+    if (!isfinite(horizontal)) return false;
+    stats.horizontalAccuracy = horizontal;
+    stats.verticalAccuracy = deviations[2];
+    ++stats.gstSentences;
+    return false;
+  }
   if (strncmp(line + 3, "GGA,", 4) != 0) return false;
   ++stats.ggaSentences;
   char* field = strchr(line, ',');

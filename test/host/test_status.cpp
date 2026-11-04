@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -65,4 +66,72 @@ int main() {
   }
   assert(consumeNmeaByte('\n', stats));
   assert(stats.fixQuality == 4);
+
+  assert(!consume(sentence("GNGST,123519.000,1,2,3,4,0.3,0.4,1.2"), stats));
+  assert(stats.gstSentences == 1);
+  assert(fabsf(stats.horizontalAccuracy - 0.5f) < 0.00001f);
+  assert(fabsf(stats.verticalAccuracy - 1.2f) < 0.00001f);
+  assert(stats.fixQuality == 4);
+  assert(!consume(sentence("GPGST,123520.000,,,,,0,0,0"), stats));
+  assert(stats.gstSentences == 2);
+  assert(stats.horizontalAccuracy == 0);
+  assert(stats.verticalAccuracy == 0);
+
+  for (const char* fields : {",0.4,1.2", "0.3,,1.2", "0.3,0.4,", "0.3,0.4",
+                             "-0.3,0.4,1.2", "0.3,-0.4,1.2", "0.3,0.4,-1.2",
+                             "nan,0.4,1.2", "0.3,inf,1.2", "0.3,0.4,nan",
+                             "0.3x,0.4,1.2", "0.3,0.4,1.2x", "1e99,0.4,1.2"}) {
+    assert(!consume(sentence(std::string("GNGST,123519.000,1,2,3,4,") + fields), stats));
+    assert(stats.gstSentences == 2);
+    assert(stats.horizontalAccuracy == 0);
+    assert(stats.verticalAccuracy == 0);
+  }
+  std::string badGst = sentence("GNGST,123519.000,1,2,3,4,0.3,0.4,1.2");
+  badGst[1] = 'X';
+  assert(!consume(badGst, stats));
+  assert(stats.gstSentences == 2);
+  assert(!consume(sentence("GNGST,123521.000,1,2,3,4,0.03,0.04,0.012"), stats));
+  assert(stats.gstSentences == 3);
+  assert(fabsf(stats.horizontalAccuracy - 0.05f) < 0.00001f);
+  assert(fabsf(stats.verticalAccuracy - 0.012f) < 0.00001f);
+
+  assert(!gstAccuracyFresh(false, 0, 0));
+  assert(gstAccuracyFresh(true, 100, 5099));
+  assert(!gstAccuracyFresh(true, 100, 5100));
+  assert(gstAccuracyFresh(true, UINT32_MAX - 999, 3999));
+  assert(!gstAccuracyFresh(true, UINT32_MAX - 999, 4000));
+
+  BleStatusOverlay overlay;
+  assert(overlay.update(false, 0) == nullptr);
+  assert(strcmp(overlay.update(true, 100), "BLE UP") == 0);
+  assert(strcmp(overlay.update(true, 5099), "BLE UP") == 0);
+  assert(overlay.update(true, 5100) == nullptr);
+  assert(overlay.update(true, 10000) == nullptr);
+  assert(strcmp(overlay.update(false, 11000), "BLE DOWN") == 0);
+  assert(strcmp(overlay.update(false, 15999), "BLE DOWN") == 0);
+  assert(overlay.update(false, 16000) == nullptr);
+  assert(strcmp(overlay.update(true, 17000), "BLE UP") == 0);
+  assert(strcmp(overlay.update(false, 18000), "BLE DOWN") == 0);
+  assert(strcmp(overlay.update(false, 22999), "BLE DOWN") == 0);
+  assert(overlay.update(false, 23000) == nullptr);
+  BleStatusOverlay wrapOverlay;
+  assert(strcmp(wrapOverlay.update(true, UINT32_MAX - 999), "BLE UP") == 0);
+  assert(strcmp(wrapOverlay.update(true, 3999), "BLE UP") == 0);
+  assert(wrapOverlay.update(true, 4000) == nullptr);
+
+  char accuracy[24];
+  formatAccuracy(accuracy, sizeof(accuracy), 0.92f);
+  assert(strcmp(accuracy, "92cm") == 0);
+  formatAccuracy(accuracy, sizeof(accuracy), 0.02f);
+  assert(strcmp(accuracy, "2.0cm") == 0);
+  formatAccuracy(accuracy, sizeof(accuracy), 1.3f);
+  assert(strcmp(accuracy, "1.3m") == 0);
+  formatAccuracy(accuracy, sizeof(accuracy), 0);
+  assert(strcmp(accuracy, "0.0cm") == 0);
+  formatAccuracy(accuracy, sizeof(accuracy), 0.009f);
+  assert(strcmp(accuracy, "0.9cm") == 0);
+  formatAccuracy(accuracy, sizeof(accuracy), 0.1f);
+  assert(strcmp(accuracy, "10cm") == 0);
+  formatAccuracy(accuracy, sizeof(accuracy), 1);
+  assert(strcmp(accuracy, "1.0m") == 0);
 }

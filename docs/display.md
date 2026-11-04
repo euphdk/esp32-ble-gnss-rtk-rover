@@ -35,7 +35,18 @@ Pin flags are in `platformio.ini`. The I2C address is `kOledAddress` in `include
 
 ## Status labels
 
-The display updates about once per second. It shows the latest valid GGA quality and BLE connection state:
+The display updates about once per second. It shows GGA fix quality in the top half and GST accuracy in the bottom half.
+
+Both halves use double-size text. There is no title row.
+The bottom half normally shows two lines, `ΔH` and `ΔV`, with adaptive units.
+Values below one meter use centimeters: one decimal below 10 cm, otherwise whole centimeters.
+Values of one meter or more use meters with one decimal. Examples: `92cm`, `2.0cm`, and `1.3m`.
+Horizontal accuracy is `sqrt(latitude deviation² + longitude deviation²)` from GST. Vertical accuracy is the GST altitude deviation.
+Missing GST, or no valid GST update for five seconds, shows `ΔH N/A` and `ΔV N/A`.
+
+When the observed BLE state changes, `BLE UP` or `BLE DOWN` replaces both accuracy lines for five seconds.
+The accuracy lines then return. A new state change restarts the five-second overlay.
+Booting without a BLE connection does not trigger an overlay.
 
 | Display | Meaning |
 | --- | --- |
@@ -47,11 +58,13 @@ The display updates about once per second. It shows the latest valid GGA quality
 | `RTK FIX` | GGA quality 4 |
 | `RTK FLOAT` | GGA quality 5 |
 | `OTHER FIX` | Another single-digit GGA quality, not interpreted as RTK |
-| `BLE UP` / `BLE DOWN` | BLE connected / disconnected, not notification subscription or correction reception |
+| `BLE UP` / `BLE DOWN` | Five-second connection/disconnection overlay, not notification subscription or correction reception |
 
 Checksum failures, malformed quality fields, and other NMEA messages do not refresh GGA status.
 Freshness tracking does not depend on serial diagnostics. A new valid GGA replaces the stale indication.
 The OLED does not confirm correction delivery or position accuracy. It adds no data to the BLE stream.
+Only checksum-valid GST sentences with finite, nonnegative latitude, longitude, and altitude deviations update the accuracy values.
+Malformed GST does not replace the last valid values or refresh their age.
 
 ## Failure behavior and checks
 
