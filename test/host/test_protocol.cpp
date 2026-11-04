@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "ble_uart.h"
+#include "ble_name.h"
 #include "nmea.h"
 #include "rtcm.h"
 
@@ -23,6 +24,14 @@ struct ShortWriter {
 };
 
 int main() {
+  char deviceName[kBleDeviceNameSize];
+  const uint8_t mac[] = {0xd8, 0x3b, 0xda, 0xe3, 0xa1, 0xb2};
+  formatBleDeviceName(deviceName, sizeof(deviceName), mac);
+  assert(std::string(deviceName) == "GNSS-RTK-Rover-A1B2");
+  const uint8_t leadingZeros[] = {0xd8, 0x3b, 0xda, 0xe3, 0x00, 0x0a};
+  formatBleDeviceName(deviceName, sizeof(deviceName), leadingZeros);
+  assert(std::string(deviceName) == "GNSS-RTK-Rover-000A");
+
   BleUartBatch batch;
   std::string bleOutput;
   std::vector<size_t> notificationSizes;

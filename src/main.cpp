@@ -3,11 +3,13 @@
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
+#include <esp_mac.h>
 #if defined(CONFIG_NIMBLE_ENABLED)
 #include <os/os_mbuf.h>
 #endif
 
 #include "ble_uart.h"
+#include "ble_name.h"
 #include "config.h"
 #include "nmea.h"
 #include "oled.h"
@@ -77,7 +79,12 @@ class TxCallbacks final : public BLECharacteristicCallbacks {
 };
 
 void startBle() {
-  BLEDevice::init(config::kDeviceName);
+  uint8_t mac[6];
+  ESP_ERROR_CHECK(esp_read_mac(mac, ESP_MAC_BT));
+  char deviceName[kBleDeviceNameSize];
+  formatBleDeviceName(deviceName, sizeof(deviceName), mac);
+  BLEDevice::init(deviceName);
+  if (config::kSerialDebug) Serial.printf("[ble] name=%s\n", deviceName);
   BLEServer* server = BLEDevice::createServer();
   server->setCallbacks(new ServerCallbacks());
   BLEService* service = server->createService(config::kServiceUuid);

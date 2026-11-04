@@ -40,7 +40,7 @@ The firmware sends receiver configuration at startup, including a request for GS
 ## Use SW Maps
 
 1. Power the receiver before starting the ESP32.
-2. Connect to **`GNSS-RTK-Rover`** through SW Maps' BLE receiver workflow.
+2. Connect to **`GNSS-RTK-Rover-XXXX`** through SW Maps' BLE receiver workflow (`XXXX` is the Bluetooth MAC suffix).
 3. Enable your NTRIP correction source in SW Maps.
 4. Check position updates, accuracy fields, and fix quality.
 

@@ -109,6 +109,7 @@ The tests cover:
 - NMEA checksum and fix parsing.
 - GST accuracy parsing, freshness, and five-second BLE display overlays.
 - BLE UART batching, rejected-chunk retention, retries, and clearing a pending chunk.
+- Bluetooth MAC suffix formatting, including leading zeros in device names.
 - Binary RTCM byte-preserving forwarding, including short writes.
 - Status quality labels, malformed input, freshness boundaries, timer wraparound, and BLE labels.
 - Receiver baud selection, command bytes, checksums, delays, repeated boots, and write failure without receiver responses.

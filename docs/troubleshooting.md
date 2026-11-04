@@ -9,7 +9,7 @@
 
 ## SW Maps setup
 
-1. Connect to `GNSS-RTK-Rover` through SW Maps' BLE GNSS/external receiver workflow.
+1. Connect to `GNSS-RTK-Rover-XXXX` through SW Maps' BLE GNSS/external receiver workflow.
 2. Select NMEA input from the TX characteristic if the app offers characteristic selection.
 3. Configure the correction source/NTRIP client in the app.
 4. Select the RX characteristic as correction output if supported.
@@ -17,6 +17,8 @@
 6. Compare the receiver's status output with the firmware status.
 
 Exact menu names vary by app version. See the [BLE protocol](ble-protocol.md) for characteristic UUIDs.
+`XXXX` is the last four uppercase hexadecimal digits of the rover's Bluetooth MAC address, including leading zeros.
+The name stays the same after a restart. The startup console prints it as `[ble] name=...`.
 For satellite and accuracy displays, use the [receiver's NMEA settings](receivers.md).
 
 ### Accuracy fields show N/A

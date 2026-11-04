@@ -6,6 +6,9 @@ The firmware provides a bidirectional UART bridge over BLE, without Bluetooth Cl
 The BLE RX characteristic accepts correction bytes for the receiver. The BLE TX characteristic provides only receiver UART bytes.
 Status output uses the serial console and [OLED](display.md).
 
+The device name is `GNSS-RTK-Rover-XXXX`, using the last four uppercase hex digits of the Bluetooth MAC address.
+The suffix is stable across restarts. It distinguishes nearby rovers, but four hex digits do not guarantee global uniqueness.
+
 ## Service and characteristics
 
 Service UUID: `6e400001-b5a3-f393-e0a9-e50e24dcca9e` (Nordic-UART-style UUIDs).
