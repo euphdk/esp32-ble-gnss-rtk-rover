@@ -50,16 +50,16 @@ Connect TX to RX in each direction. The firmware uses ESP32 hardware UART1. The 
 
 ### LC29H(DA) wiring
 
-Confirm which carrier contacts provide receiver TX, receiver RX, and ground before connecting them.
+Confirm which carrier contacts provide receiver TX and receiver RX before connecting them.
 Confirm that the selected receiver UART accepts commands and RTCM and outputs NMEA at 115200 baud.
 
 | Receiver signal | ESP32-S3 | ESP32-C3 SuperMini |
 | --- | --- | --- |
 | TX | GPIO16 (GNSS RX) | GPIO4 (GNSS RX) |
 | RX | GPIO17 (GNSS TX) | GPIO5 (GNSS TX) |
-| Ground | GND | GND |
+| G (ground) | GND | GND |
 
-Use 3.3 V UART logic. Confirm the carrier's power input and voltage rating before applying power.
+Use 3.3 V UART logic. The carrier header's `V` contact is its power input. It accepts 5 V, but its full input voltage range is not confirmed.
 Connect a suitable GNSS antenna after confirming the carrier's antenna and active-antenna requirements with the supplier.
 The photo does not establish the functions of the other header contacts. Leave them unconnected unless their functions are confirmed.
 
@@ -67,7 +67,7 @@ The photo does not establish the functions of the other header contacts. Leave t
 
 - UART signals must use 3.3 V logic. Never connect 5 V to an ESP32 GPIO or a receiver UART pin.
 - The connector's `5V` label refers to board power, not UART voltage. The bare ZED-F9P module requires a regulated supply below 5 V.
-- Confirm the carrier board's input rating and regulator arrangement with the seller before supplying power through its `5V` pin.
+- Confirm the carrier board's input rating with the seller before supplying power through its `5V` pin.
 - Alternatively, power the receiver board through its USB-C connector with an appropriate USB supply.
 - Connect the ESP32 and receiver grounds even when each board has a separate supply.
 - Do not connect multiple receiver power inputs together without confirming the board's power-path design.
@@ -91,22 +91,25 @@ This plan uses one 18650 Li-ion cell, a TP4056-style charger with battery protec
   cell+  |    |    +-------------------+------ C3 GND
   cell- -+    |                        +------ receiver GND
               |                        |
-              +---- switch ---- regulator VI
-                                  regulator GND
-                                      |
-                                      +---- OUT- / common ground
-                                  regulator VO (3.3 V)
-                                      |
-                                      +------- C3 3V3
+              +---- switch ----+---- regulator VI
+                               |       regulator GND ---- OUT- / common ground
+                               |       regulator VO (3.3 V) ---- C3 3V3
+                               |
+                               +---- [optional 5 V boost] ---- LC29H(DA) V
+                                     (see conditions below)
 ```
 
-Connect the cell only to `B+` and `B-`. Connect the load to `OUT+` and `OUT-` so it uses the charger's protection circuit. The switch disconnects the regulator input, not the charger or the cell.
+Connect the cell only to `B+` and `B-`. Connect the load to `OUT+` and `OUT-` so it uses the charger's protection circuit. The switch disconnects both load branches, not the charger or the cell.
 
 The supplied charger product photo shows the USB-C connector at the top. In that view, its bottom pads read left to right: `OUT+`, `B+`, `B-`, `OUT-`. The top input pads are `+` on the left and `-` on the right. Check the labels on the actual board because other modules can differ.
 
 The supplied regulator photo shows the label side with the pins pointing right. From top to bottom, the labels are `VO`, `GND`, `VI`. Connect `VI` to the switched charger output, `GND` to `OUT-`, and `VO` to the C3 `3V3` pin. Do not use the C3 `5V` pin for this supply.
 
-The C3 uses GPIO4 for GNSS RX and GPIO5 for GNSS TX. If enabled, the OLED uses GPIO6 for SDA and GPIO7 for SCL. Connect the receiver ground to the same ground. The regulator output does not establish a suitable receiver supply: confirm the receiver carrier's power input and rating separately. In particular, do not connect 3.3 V to the ZED-F9P carrier's `5V` input without confirmation.
+The LC29H(DA) carrier has its own 3.3 V regulator. Do not connect its `V` input to the external 3.3 V regulator output. The ZED-F9P carrier also has its own 3.3 V regulator. Its input must exceed 3.3 V by enough to account for regulator dropout. Its exact input voltage range is unknown. Do not connect its power input to the external 3.3 V regulator output.
+
+The switched `OUT+` supply is approximately the cell voltage, about 3.0–4.2 V, not boosted 5 V. For the LC29H(DA), connect switched `OUT+` to a suitable 5 V boost converter input. Connect its output to the carrier's `V` contact. The carrier accepts 5 V, but its maximum input voltage is not confirmed. Omit the boost only if the carrier's input range covers the full cell voltage range. Use a boost converter rated for the cell voltage range and receiver load. Confirm the ZED-F9P `5V` pin rating before using it.
+
+The C3 uses GPIO4 for GNSS RX and GPIO5 for GNSS TX. If enabled, the OLED uses GPIO6 for SDA and GPIO7 for SCL. Connect the LC29H(DA) carrier's `G` contact and any boost converter ground to `OUT-`.
 
 Before connecting the boards:
 
