@@ -24,11 +24,11 @@ void startOled() {
   display.setTextSize(2);
   display.setTextColor(SSD1306_WHITE);
   display.setTextWrap(false);
-  updateOled("NO GGA", false, false, 0, 0);
+  updateOled("NO GGA", false, false, 0, 0, "TIME N/A");
 }
 
 void updateOled(const char* fixLabel, bool connected, bool haveAccuracy,
-                float horizontalAccuracy, float verticalAccuracy) {
+                float horizontalAccuracy, float verticalAccuracy, const char* utcDateTime) {
   if (!ready) return;
   // Stop updates after a disconnect instead of repeating failed frame transfers.
   Wire.beginTransmission(config::kOledAddress);
@@ -37,6 +37,7 @@ void updateOled(const char* fixLabel, bool connected, bool haveAccuracy,
     return;
   }
   display.clearDisplay();
+  display.setTextSize(2);
   display.setCursor(0, 8);
   const char* warning = strstr(fixLabel, " (!)");
   if (warning != nullptr) {
@@ -48,18 +49,22 @@ void updateOled(const char* fixLabel, bool connected, bool haveAccuracy,
   } else {
     display.print(fixLabel);
   }
+  display.setTextSize(1);
+  display.setCursor(0, 36);
+  display.print(utcDateTime);
   const char* bleLabel = bleOverlay.update(connected, millis());
   if (bleLabel != nullptr) {
-    display.setCursor(0, 40);
+    display.setTextSize(2);
+    display.setCursor(0, 48);
     display.print(bleLabel);
   } else {
     const float values[] = {horizontalAccuracy, verticalAccuracy};
     const char* labels[] = {"H", "V"};
     for (int i = 0; i < 2; ++i) {
-      const int y = 32 + i * 16;
+      const int x = i * 64;
       // The default font lacks Greek delta, so draw its outline.
-      display.drawTriangle(0, y + 13, 5, y + 1, 10, y + 13, SSD1306_WHITE);
-      display.setCursor(14, y);
+      display.drawTriangle(x, 62, x + 2, 56, x + 4, 62, SSD1306_WHITE);
+      display.setCursor(x + 6, 56);
       display.print(labels[i]);
       display.print(' ');
       if (haveAccuracy) {

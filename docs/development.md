@@ -108,6 +108,7 @@ The tests cover:
 
 - NMEA checksum and fix parsing.
 - GST accuracy parsing, freshness, and five-second BLE display overlays.
+- RMC date/time parsing, UTC clock freshness, calendar validation, and year rollover.
 - Configurable correction staleness, RTK FIX warnings, recovery, and timer wraparound.
 - BLE UART batching, rejected-chunk retention, retries, and clearing a pending chunk.
 - Bluetooth MAC suffix formatting, including leading zeros in device names.

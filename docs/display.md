@@ -35,17 +35,24 @@ Pin flags are in `platformio.ini`. The I2C address is `kOledAddress` in `include
 
 ## Status labels
 
-The display updates about once per second. It shows GGA fix quality in the top half and GST accuracy in the bottom half.
+The display updates about once per second. There is no title row.
 
-Both halves use double-size text. There is no title row.
-The bottom half normally shows two lines, `ΔH` and `ΔV`, with adaptive units.
+- Top: GGA fix quality in double-size text, with a smaller stale-correction warning when applicable.
+- Middle: receiver UTC date and time in small text, formatted as `yyyy/mm/dd hh:mm:ssZ`.
+- Bottom: `ΔH` and `ΔV` together on one line in small text, with adaptive units.
+
+The full date and time fit within the 128-pixel display width. `Z` means UTC, not local time.
+The clock uses checksum-valid RMC sentences with valid date and time fields. It also works when RMC reports an invalid position.
+Missing time, or no valid RMC date/time update for five seconds, shows `TIME N/A` instead of an old clock value.
+RMC's two-digit year maps to 1980–2079. The firmware does not change the receiver's date or apply a local time zone.
+
 Values below one meter use centimeters: one decimal below 10 cm, otherwise whole centimeters.
 Values of one meter or more use meters with one decimal. Examples: `92cm`, `2.0cm`, and `1.3m`.
 Horizontal accuracy is `sqrt(latitude deviation² + longitude deviation²)` from GST. Vertical accuracy is the GST altitude deviation.
 Missing GST, or no valid GST update for five seconds, shows `ΔH N/A` and `ΔV N/A`.
 
-When the observed BLE state changes, `BLE UP` or `BLE DOWN` replaces both accuracy lines for five seconds.
-The accuracy lines then return. A new state change restarts the five-second overlay.
+When the observed BLE state changes, a double-size `BLE UP` or `BLE DOWN` replaces the accuracy row for five seconds.
+The clock remains visible. The accuracy row then returns. A new state change restarts the five-second overlay.
 Booting without a BLE connection does not trigger an overlay.
 
 | Display | Meaning |

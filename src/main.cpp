@@ -23,6 +23,7 @@ NmeaStats nmeaStats;
 bool haveGga = false;
 uint32_t lastGgaMs = 0;
 uint32_t lastGstMs = 0;
+uint32_t lastRmcMs = 0;
 bool bleConnected = false;
 unsigned long rtcmBytes = 0;
 uint32_t lastCorrectionMs = 0;
@@ -219,11 +220,13 @@ void loop() {
       }
       portENTER_CRITICAL(&sharedMux);
       const unsigned long previousGstSentences = nmeaStats.gstSentences;
+      const unsigned long previousRmcSentences = nmeaStats.rmcSentences;
       if (consumeNmeaByte(byte, nmeaStats)) {
         haveGga = true;
         lastGgaMs = millis();
       }
       if (nmeaStats.gstSentences != previousGstSentences) lastGstMs = millis();
+      if (nmeaStats.rmcSentences != previousRmcSentences) lastRmcMs = millis();
       const bool connected = bleConnected;
       portEXIT_CRITICAL(&sharedMux);
       if (connected && txCharacteristic != nullptr) {
@@ -253,7 +256,8 @@ void loop() {
     updateOled(fixStatusLabel(haveGga, lastGgaMs, now, nmeaStats.fixQuality,
                               staleCorrections), connected,
                gstAccuracyFresh(nmeaStats.gstSentences > 0, lastGstMs, now),
-               nmeaStats.horizontalAccuracy, nmeaStats.verticalAccuracy);
+               nmeaStats.horizontalAccuracy, nmeaStats.verticalAccuracy,
+               utcTimeLabel(nmeaStats.rmcSentences > 0, lastRmcMs, now, nmeaStats.utcDateTime));
 #endif
   }
   delay(1);

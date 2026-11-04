@@ -5,6 +5,7 @@
 
 constexpr uint32_t kGgaStaleMs = 5000;
 constexpr uint32_t kGstStaleMs = 5000;
+constexpr uint32_t kRmcStaleMs = 5000;
 constexpr uint32_t kBleOverlayMs = 5000;
 
 inline const char* fixStatusLabel(bool haveGga, uint32_t lastGgaMs, uint32_t now,
@@ -31,6 +32,12 @@ inline const char* bleStatusLabel(bool connected) {
 
 inline bool gstAccuracyFresh(bool haveGst, uint32_t lastGstMs, uint32_t now) {
   return haveGst && static_cast<uint32_t>(now - lastGstMs) < kGstStaleMs;
+}
+
+inline const char* utcTimeLabel(bool haveRmc, uint32_t lastRmcMs, uint32_t now,
+                                const char* utcDateTime) {
+  if (!haveRmc || static_cast<uint32_t>(now - lastRmcMs) >= kRmcStaleMs) return "TIME N/A";
+  return utcDateTime;
 }
 
 inline void formatAccuracy(char* output, size_t capacity, float meters) {

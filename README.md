@@ -2,7 +2,7 @@
 
 An **ESP32-C3 SuperMini + Quectel LC29H(DA) + 128×64 SSD1306 OLED** rover for SW Maps.
 The ESP32 forwards receiver data over BLE and sends the phone's RTCM corrections to the receiver.
-The OLED shows fix quality and GST accuracy, with brief BLE connection notifications. The receiver computes the RTK solution.
+The OLED shows fix quality, UTC date/time, and GST accuracy, with brief BLE connection notifications. The receiver computes the RTK solution.
 
 ## Connect the hardware
 

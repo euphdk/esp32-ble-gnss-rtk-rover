@@ -149,4 +149,42 @@ int main() {
   assert(strcmp(accuracy, "10cm") == 0);
   formatAccuracy(accuracy, sizeof(accuracy), 1);
   assert(strcmp(accuracy, "1.0m") == 0);
+
+  assert(!consume(sentence("GNRMC,170203.125,A,5642.7,N,00921.7,E,0.0,0.0,041126,,,A"), stats));
+  assert(stats.rmcSentences == 1);
+  assert(strcmp(stats.utcDateTime, "2026/11/04 17:02:03Z") == 0);
+  assert(strlen(stats.utcDateTime) == 20);
+  assert(!consume(sentence("GPRMC,235959,V,,,,,,,290224,,,N"), stats));
+  assert(stats.rmcSentences == 2);
+  assert(strcmp(stats.utcDateTime, "2024/02/29 23:59:59Z") == 0);
+  assert(!consume(sentence("GPRMC,000000,A,,,,,,,230394"), stats));
+  assert(stats.rmcSentences == 3);
+  assert(strcmp(stats.utcDateTime, "1994/03/23 00:00:00Z") == 0);
+
+  for (const char* time : {"", "17020", "170203x", "170203.", "170203.1x",
+                           "240000", "176000", "170260", "abcdef"}) {
+    assert(!consume(sentence(std::string("GNRMC,") + time + ",A,,,,,,,041126"), stats));
+    assert(stats.rmcSentences == 3);
+    assert(strcmp(stats.utcDateTime, "1994/03/23 00:00:00Z") == 0);
+  }
+  for (const char* date : {"", "04112", "041126x", "abcdef", "001126", "321126",
+                           "040026", "041326", "290223", "310426"}) {
+    assert(!consume(sentence(std::string("GNRMC,170203,A,,,,,,,") + date), stats));
+    assert(stats.rmcSentences == 3);
+    assert(strcmp(stats.utcDateTime, "1994/03/23 00:00:00Z") == 0);
+  }
+  assert(!consume(sentence("GNRMC,170203,A"), stats));
+  std::string badRmc = sentence("GNRMC,170203,A,,,,,,,041126");
+  badRmc[1] = 'X';
+  assert(!consume(badRmc, stats));
+  assert(stats.rmcSentences == 3);
+  assert(!consume(sentence("GNRMC,000000.000,A,,,,,,,010127"), stats));
+  assert(stats.rmcSentences == 4);
+  assert(strcmp(stats.utcDateTime, "2027/01/01 00:00:00Z") == 0);
+
+  assert(strcmp(utcTimeLabel(false, 0, 0, stats.utcDateTime), "TIME N/A") == 0);
+  assert(strcmp(utcTimeLabel(true, 100, 5099, stats.utcDateTime), stats.utcDateTime) == 0);
+  assert(strcmp(utcTimeLabel(true, 100, 5100, stats.utcDateTime), "TIME N/A") == 0);
+  assert(strcmp(utcTimeLabel(true, UINT32_MAX - 999, 3999, stats.utcDateTime), stats.utcDateTime) == 0);
+  assert(strcmp(utcTimeLabel(true, UINT32_MAX - 999, 4000, stats.utcDateTime), "TIME N/A") == 0);
 }

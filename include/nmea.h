@@ -11,6 +11,8 @@ struct NmeaStats {
   // GST accuracy in meters: horizontal RSS of latitude/longitude, and altitude.
   float horizontalAccuracy = 0;
   float verticalAccuracy = 0;
+  unsigned long rmcSentences = 0;
+  char utcDateTime[21] = {};
 };
 
 // Returns true only when a complete, checksum-valid GGA updates fix quality.
