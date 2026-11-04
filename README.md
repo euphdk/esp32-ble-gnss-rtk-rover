@@ -1,6 +1,6 @@
 # ESP32 BLE RTK rover
 
-An **ESP32-C3 SuperMini + Quectel LC29H(DA) + 64×48 SSD1306 OLED** rover for SW Maps.
+An **ESP32-C3 SuperMini + Quectel LC29H(DA) + 128×64 SSD1306 OLED** rover for SW Maps.
 The ESP32 forwards receiver data over BLE and sends the phone's RTCM corrections to the receiver.
 The OLED shows fix quality and BLE connection state. The receiver computes the RTK solution.
 
@@ -17,7 +17,7 @@ Disconnect power before wiring. Use 3.3 V UART and I2C logic, with a shared grou
 | GPIO7 | OLED SCL |
 | 3V3 | OLED VCC |
 
-The display must be a 64×48 SSD1306 at I2C address `0x3C`.
+The display must be a 128×64 SSD1306 at I2C address `0x3C`.
 Confirm the receiver carrier's UART routing and power connections before use.
 The LC29H carrier accepts 5 V at `V`; do not power that input from the C3's 3V3 pin.
 See [hardware details](docs/hardware.md) and the [battery power plan](docs/battery-power.md) before assembly.
@@ -46,7 +46,7 @@ The firmware sends receiver configuration at startup, including a request for GS
 
 No serial monitor is required for operation. See [troubleshooting](docs/troubleshooting.md) if updates stop while BLE remains connected.
 Positioning, GST accuracy fields, and RTK FLOAT have been confirmed with the C3 and LC29H(DA).
-The OLED integration, RTK FIX, and long-duration reliability still need hardware checks.
+The 128×64 OLED output is confirmed readable. Sustained throughput with the display and long-duration reliability still need hardware checks.
 
 ## Documentation
 

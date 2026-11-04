@@ -120,8 +120,8 @@ The earlier prototype documentation described all receiver hardware as unverifie
 - Serial diagnostics showed receiver traffic and incoming corrections during a 90-second capture. BLE packet buffers recovered rather than remaining exhausted.
 - The startup console reports free heap. This is not a battery or power measurement.
 
-Remaining hardware checks include RTK FIX, long-duration reliability, sustained BLE throughput, and operation with the OLED attached.
-OLED controller offsets and display appearance also need confirmation.
+The user confirmed clean, readable output with the 128×64 SSD1306 attached after correcting the framebuffer dimensions.
+Remaining hardware checks include long-duration reliability and sustained BLE throughput with the OLED attached.
 The ESP32-S3 build remains unverified against the receiver hardware.
 
 ### Monitor-closed regression check

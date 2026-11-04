@@ -1,4 +1,4 @@
-# 64×48 I2C OLED
+# 128×64 I2C OLED
 
 [Back to README](../README.md)
 
@@ -13,9 +13,9 @@ make build ENV=esp32-s3-oled
 ```
 
 Use the same environment for upload and monitor. These environments add the Adafruit SSD1306 and GFX libraries.
-The firmware assumes a 64×48 SSD1306 at I2C address `0x3C`, internal charge pump, and no separate reset wire.
+The firmware uses a 128×64 SSD1306 at I2C address `0x3C`, internal charge pump, and no separate reset wire.
 It uses the library's default controller initialization and column/page addressing, without a module-specific offset.
-Some 64×48 modules need different offsets or use another controller. Those modules are not covered by this configuration.
+Panels with other dimensions or controllers, such as SH1106, are not covered by this configuration.
 
 ## Wiring
 
@@ -58,4 +58,5 @@ The OLED does not confirm correction delivery or position accuracy. It adds no d
 The firmware probes the display at startup. If it is absent, the firmware skips display updates and continues GNSS/BLE operation.
 I2C operations use a five-millisecond driver timeout. Display transfers are synchronous and add loop latency, not a separate task.
 If a later probe fails, updates stop until the ESP32 restarts. Hot-plug recovery is not supported.
-OLED wiring, controller offsets, display appearance, and forwarding throughput with the display require hardware checks.
+The user confirmed clean, readable output on the 128×64 SSD1306 after correcting the earlier 64×48 configuration.
+Sustained forwarding throughput with the display still requires hardware checks.

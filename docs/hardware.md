@@ -2,7 +2,7 @@
 
 [Back to README](../README.md)
 
-The final hardware target is the ESP32-C3 SuperMini with an LC29H(DA) receiver and a [64×48 I2C OLED](display.md).
+The final hardware target is the ESP32-C3 SuperMini with an LC29H(DA) receiver and a [128×64 I2C OLED](display.md).
 The project also supports an ESP32-S3 N16R8 and a u-blox ZED-F9P.
 All targets use BLE, without Bluetooth Classic. USB serial carries diagnostic output.
 

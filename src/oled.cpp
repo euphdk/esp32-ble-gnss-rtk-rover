@@ -8,7 +8,7 @@
 #include "rover_status.h"
 
 namespace {
-Adafruit_SSD1306 display(64, 48, &Wire, -1);
+Adafruit_SSD1306 display(128, 64, &Wire, -1);
 bool ready = false;
 }
 
