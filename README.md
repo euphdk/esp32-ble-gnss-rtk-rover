@@ -75,6 +75,49 @@ The photo does not establish the functions of the other header contacts. Leave t
 
 The photo shows an SMA antenna connector at the bottom and a small coaxial connector labeled `J4`. Their routing and antenna-bias circuitry require the carrier schematic. Do not assume both connectors support simultaneous use.
 
+### ESP32-C3 battery power plan
+
+This plan uses one 18650 Li-ion cell, a TP4056-style charger with battery protection, and a regulator verified to output 3.3 V. Confirm the remaining ratings below before assembly. This is not a verified complete power system.
+
+```text
+  5 V USB supply
+       |
+  charger USB-C input
+  +------------------+
+  | charger          |
+  | B+  B-  OUT+ OUT-|
+  +--|---|----|----|-+
+     |   |    |    |
+  cell+  |    |    +-------------------+------ C3 GND
+  cell- -+    |                        +------ receiver GND
+              |                        |
+              +---- switch ---- regulator VI
+                                  regulator GND
+                                      |
+                                      +---- OUT- / common ground
+                                  regulator VO (3.3 V)
+                                      |
+                                      +------- C3 3V3
+```
+
+Connect the cell only to `B+` and `B-`. Connect the load to `OUT+` and `OUT-` so it uses the charger's protection circuit. The switch disconnects the regulator input, not the charger or the cell.
+
+The supplied charger product photo shows the USB-C connector at the top. In that view, its bottom pads read left to right: `OUT+`, `B+`, `B-`, `OUT-`. The top input pads are `+` on the left and `-` on the right. Check the labels on the actual board because other modules can differ.
+
+The supplied regulator photo shows the label side with the pins pointing right. From top to bottom, the labels are `VO`, `GND`, `VI`. Connect `VI` to the switched charger output, `GND` to `OUT-`, and `VO` to the C3 `3V3` pin. Do not use the C3 `5V` pin for this supply.
+
+The C3 uses GPIO4 for GNSS RX and GPIO5 for GNSS TX. If enabled, the OLED uses GPIO6 for SDA and GPIO7 for SCL. Connect the receiver ground to the same ground. The regulator output does not establish a suitable receiver supply: confirm the receiver carrier's power input and rating separately. In particular, do not connect 3.3 V to the ZED-F9P carrier's `5V` input without confirmation.
+
+Before connecting the boards:
+
+- Confirm the cell chemistry, charge voltage, permitted charge current, polarity, and protection requirements. Confirm the charger's actual charge current and protection functions.
+- Confirm the regulator's input range, output current, dropout or conversion behavior, and stability across the cell voltage range. A verified 3.3 V output alone does not establish these ratings.
+- Measure the regulator output and polarity without the C3 or receiver connected. Check the output again under the intended load.
+- Do not assume the charger supports powering the load while charging. Use a verified power-path circuit or switch the load off during charging.
+- Do not connect the C3 USB supply and external 3.3 V at the same time unless the board's power path is verified safe against backfeeding.
+
+Battery voltage measurement would need a divider to keep the ADC input within its safe range. The current firmware does not measure battery voltage. Do not connect the cell directly to an ESP32 GPIO.
+
 ## Optional 64×48 I2C OLED
 
 OLED support is disabled in all original environments. Append `-oled` to any environment name to enable it:
