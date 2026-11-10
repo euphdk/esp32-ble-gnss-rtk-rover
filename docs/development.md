@@ -78,7 +78,19 @@ These behaviors vary by board and have not all been checked on this hardware.
 
 Both C3 + LC29H environments use `/dev/tty.usbmodem12301` for upload and monitor.
 The OLED environment references the port settings in `esp32-c3-lc29h-da`, so `make upload` and `make monitor` avoid automatic selection.
-Change those settings in `platformio.ini` if the C3 port changes, or override them explicitly:
+Override both settings with `PORT`, like `ENV`:
+
+```sh
+make upload PORT=/dev/tty.usbmodem12301
+make monitor PORT=/dev/tty.usbmodem12301
+make upload ENV=esp32-s3 PORT=/path/to/esp32-port
+make monitor ENV=esp32-s3 PORT=/path/to/esp32-port
+```
+
+You can also set `PORT` in the shell environment.
+If you omit it, Make uses the port settings from `platformio.ini` or PlatformIO's automatic selection.
+
+For direct PlatformIO commands, use the port flags:
 
 ```sh
 pio run -e esp32-c3-lc29h-da-oled -t upload --upload-port /dev/tty.usbmodem12301

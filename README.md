@@ -30,8 +30,8 @@ Make defaults to **`esp32-c3-lc29h-da-oled`**. Override it with `ENV` for other 
 ```sh
 make test
 make build
-pio run -e esp32-c3-lc29h-da-oled -t upload --upload-port /dev/tty.usbmodem12301
-pio device monitor -e esp32-c3-lc29h-da-oled --port /dev/tty.usbmodem12301
+make upload PORT=/dev/tty.usbmodem12301
+make monitor PORT=/dev/tty.usbmodem12301
 ```
 
 Replace the port with your C3's USB port. The console uses 115200 baud.
