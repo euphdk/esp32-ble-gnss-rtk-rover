@@ -6,7 +6,7 @@
 #include "gnss_receiver.h"
 
 // UART1 pins come from the PlatformIO environment build flags
-// (esp32-s3: GPIO16/17, esp32-c3: GPIO4/5). Defaults keep the S3 wiring.
+// (S3: GPIO16/17, C3: GPIO4/5, XIAO C6: GPIO17/16). Defaults keep the S3 wiring.
 #ifndef GNSS_RX_PIN
 #define GNSS_RX_PIN 16
 #endif

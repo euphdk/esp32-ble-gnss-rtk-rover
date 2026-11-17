@@ -8,12 +8,16 @@ Install Make and PlatformIO Core. Host tests also require a C++17 compiler.
 The project pins PlatformIO's Espressif32 platform to `~8.0.0`.
 BLE uses the Arduino ESP32 core's bundled `BLEDevice` GATT API.
 
-The final hardware target uses **`esp32-c3-lc29h-da-oled`**.
-Make defaults to `esp32-c3-lc29h-da-oled`. Override it with `ENV` for other hardware.
-Direct PlatformIO commands still default to `esp32-s3` unless you specify `-e`.
+The default hardware target uses **`xiao-esp32-c6-lc29h-da-oled`**.
+Make defaults to this target. Override it with `ENV` for other hardware.
+Direct PlatformIO commands use the same default. Override it with `-e`.
 
 | Environment | ESP32 board | Receiver | OLED |
 | --- | --- | --- | --- |
+| `xiao-esp32-c6-lc29h-da-oled` | XIAO C6 + Grove Base | LC29H(DA) | Yes |
+| `xiao-esp32-c6-lc29h-da` | XIAO C6 + Grove Base | LC29H(DA) | No |
+| `xiao-esp32-c6-oled` | XIAO C6 + Grove Base | ZED-F9P | Yes |
+| `xiao-esp32-c6` | XIAO C6 + Grove Base | ZED-F9P | No |
 | `esp32-c3-lc29h-da-oled` | C3 SuperMini | LC29H(DA) | Yes |
 | `esp32-c3-lc29h-da` | C3 SuperMini | LC29H(DA) | No |
 | `esp32-c3-oled` | C3 SuperMini | ZED-F9P | Yes |
@@ -25,19 +29,29 @@ Direct PlatformIO commands still default to `esp32-s3` unless you specify `-e`.
 
 The ESP32-S3 N16R8 has 16 MB flash and 8 MB octal PSRAM.
 The ESP32-C3 SuperMini uses the `esp32-c3-devkitm-1` board definition, with 4 MB flash and no PSRAM.
+The XIAO C6 uses `seeed_xiao_esp32c6`, with 4 MB flash and no PSRAM.
+Its profiles use the Grove Base's labeled Serial and I2C ports. See [wiring](hardware.md#xiao-esp32-c6-with-grove-base).
 The original ZED-F9P environments use 38400 baud without startup commands.
 LC29H(DA) environments use 115200 baud and [startup commands](receivers.md#startup-commands).
 Custom environments can set `-DGNSS_RECEIVER=GNSS_RECEIVER_LC29H_DA`. Unsupported receiver values fail compilation.
 
 ## Commands
 
-`make` defaults to `make build` for the C3 + LC29H(DA) + OLED target:
+`make` defaults to `make build` for the XIAO C6 + LC29H(DA) + OLED target:
 
 ```sh
 make test
 make build
 make upload
 make monitor
+```
+
+For the XIAO C6 with LC29H(DA) and OLED:
+
+```sh
+make build ENV=xiao-esp32-c6-lc29h-da-oled
+make upload ENV=xiao-esp32-c6-lc29h-da-oled PORT=/path/to/xiao-port
+make monitor ENV=xiao-esp32-c6-lc29h-da-oled PORT=/path/to/xiao-port
 ```
 
 Use the same environment for build, upload, and monitor. Other supported examples:
@@ -65,6 +79,11 @@ It shows startup diagnostics, including the free-heap measurement at boot.
 
 ## Upload and console ports
 
+XIAO ESP32-C6: use its USB-C port for upload and diagnostics.
+The board definition enables the native USB CDC console. GNSS uses the separate Serial Grove port.
+The C6 profiles use automatic port selection unless you set `PORT`.
+If upload fails, hold BOOT while pressing RESET, release BOOT, and retry with the detected USB port.
+
 ESP32-S3: use the board's USB-to-UART connector for upload and diagnostic output. The receiver's USB port is separate.
 
 ESP32-C3 SuperMini: the board exposes only its native USB connection, without a USB-to-UART bridge.
@@ -77,7 +96,7 @@ The CDC port can disappear while the board resets or enters the bootloader. Its 
 These behaviors vary by board and have not all been checked on this hardware.
 
 Both C3 + LC29H environments use `/dev/tty.usbmodem12301` for upload and monitor.
-The OLED environment references the port settings in `esp32-c3-lc29h-da`, so `make upload` and `make monitor` avoid automatic selection.
+The C3 OLED environment references the port settings in `esp32-c3-lc29h-da`, so those profiles avoid automatic selection.
 Override both settings with `PORT`, like `ENV`:
 
 ```sh

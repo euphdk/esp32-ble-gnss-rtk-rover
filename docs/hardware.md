@@ -2,8 +2,9 @@
 
 [Back to README](../README.md)
 
-The final hardware target is the ESP32-C3 SuperMini with an LC29H(DA) receiver and a [128×64 I2C OLED](display.md).
-The project also supports an ESP32-S3 N16R8 and a u-blox ZED-F9P.
+The default target is the XIAO ESP32-C6 with an LC29H(DA) receiver and a [128×64 I2C OLED](display.md).
+It uses the Seeed Studio Grove Base for XIAO with embedded battery management.
+The project also supports an ESP32-C3 SuperMini, an ESP32-S3 N16R8, and a u-blox ZED-F9P.
 All targets use BLE, without Bluetooth Classic. USB serial carries diagnostic output.
 
 ## Receiver boards
@@ -34,6 +35,38 @@ Disconnect power before connecting wires. Identify each contact by its board lab
 Connect TX to RX in each direction. The firmware uses ESP32 hardware UART1.
 ESP32 UART numbering is independent of the receiver's UART numbering.
 
+### XIAO ESP32-C6 with Grove Base
+
+Use the base's labeled **Serial** port for GNSS and either labeled **I2C** port for the OLED.
+Both I2C ports share the same bus. XIAO `D` labels are not ESP32 GPIO numbers.
+
+| Grove port | Contact | XIAO label | ESP32-C6 GPIO | Connection |
+| --- | --- | --- | --- | --- |
+| Serial | 1 (RX) | D7 | GPIO17 | Receiver TX |
+| Serial | 2 (TX) | D6 | GPIO16 | Receiver command/RTCM RX |
+| Serial | 3 (VCC) | 3V3 | — | LC29H carrier `V` |
+| Serial | 4 (GND) | GND | — | Receiver ground |
+| I2C | 1 (SCL) | D5 | GPIO23 | OLED SCL |
+| I2C | 2 (SDA) | D4 | GPIO22 | OLED SDA |
+| I2C | 3 (VCC) | 3V3 | — | OLED VCC |
+| I2C | 4 (GND) | GND | — | OLED GND |
+
+Confirm contact numbering against the base schematic and connector labels before making a cable.
+Use 3.3 V UART logic and OLED pull-ups to 3.3 V.
+The firmware routes hardware UART1 to these pins. USB carries diagnostics and does not use the Serial Grove port.
+
+The user confirmed that the LC29H carrier works from 3.3 V.
+The Serial Grove port can therefore carry its power, ground, and both UART signals.
+Check the combined XIAO, receiver, antenna, and OLED load against the base's current rating.
+For the ZED-F9P carrier, leave the Serial VCC contact disconnected and follow the power checks below.
+See [XIAO battery power](battery-power.md#xiao-esp32-c6-with-grove-base).
+
+Use `xiao-esp32-c6-lc29h-da-oled` for the LC29H(DA) and OLED.
+The [development guide](development.md) lists the other C6 profiles. Hardware operation still requires validation.
+
+Sources: [XIAO C6 pin map](https://wiki.seeedstudio.com/xiao_esp32c6_getting_started/#pin-map)
+and [Grove Base documentation and schematics](https://wiki.seeedstudio.com/Grove-Shield-for-Seeeduino-XIAO-embedded-battery-management-chip/).
+
 ### LC29H(DA)
 
 Confirm which carrier contacts provide receiver TX and receiver RX before connecting them.
@@ -46,8 +79,8 @@ The selected receiver UART must accept commands and RTCM and output NMEA at 1152
 | G (ground) | GND | GND |
 
 Use 3.3 V UART logic. The carrier header's `V` contact is its power input.
-It accepts 5 V, but its full input voltage range is not confirmed.
-The carrier has its own 3.3 V regulator. Do not connect its `V` input to an external 3.3 V regulator output.
+The user confirmed operation from 3.3 V at `V`. The carrier also accepts 5 V.
+Its full input voltage range is not confirmed. Do not apply raw cell voltage without checking that range.
 Connect a suitable GNSS antenna after confirming the carrier's antenna and active-antenna requirements with the supplier.
 The photo does not establish the functions of the other header contacts. Leave them unconnected unless their functions are confirmed.
 

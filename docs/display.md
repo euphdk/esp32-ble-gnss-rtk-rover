@@ -2,7 +2,7 @@
 
 [Back to README](../README.md)
 
-The final hardware target uses the `esp32-c3-lc29h-da-oled` environment.
+The default hardware target uses the `xiao-esp32-c6-lc29h-da-oled` environment.
 OLED support is disabled in the original environments. Append `-oled` to an environment name to enable it:
 
 ```sh
@@ -10,6 +10,8 @@ make build ENV=esp32-c3-lc29h-da-oled
 make build ENV=esp32-s3-lc29h-da-oled
 make build ENV=esp32-c3-oled
 make build ENV=esp32-s3-oled
+make build ENV=xiao-esp32-c6-lc29h-da-oled
+make build ENV=xiao-esp32-c6-oled
 ```
 
 Use the same environment for upload and monitor. These environments add the Adafruit SSD1306 and GFX libraries.
@@ -32,6 +34,10 @@ Check the module's pin labels and pull-up voltage. Do not use pull-ups to 5 V.
 These pins avoid the configured GNSS UART pins, USB pins, and boot strapping pins on each target.
 They assume the board exposes these GPIOs without other peripherals attached. Check your board before connection.
 Pin flags are in `platformio.ini`. The I2C address is `kOledAddress` in `include/config.h`.
+
+For the XIAO ESP32-C6, use the Grove Base's labeled I2C port.
+Connect SCL to D5/GPIO23, SDA to D4/GPIO22, VCC to the port's 3.3 V supply, and GND to ground.
+See the [Grove contact table](hardware.md#xiao-esp32-c6-with-grove-base) before making a cable.
 
 ## Status labels
 

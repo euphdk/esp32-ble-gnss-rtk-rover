@@ -7,8 +7,9 @@
 
 ## LC29H(DA)
 
-Use `esp32-c3-lc29h-da-oled` for the final hardware target.
-The non-display environments are `esp32-c3-lc29h-da` and `esp32-s3-lc29h-da`. Other LC29H variants are not covered.
+Use `xiao-esp32-c6-lc29h-da-oled` for the default hardware target.
+The non-display environments are `xiao-esp32-c6-lc29h-da`, `esp32-c3-lc29h-da`, and `esp32-s3-lc29h-da`.
+Other LC29H variants are not covered.
 These builds use **115200 baud, 8N1**. They keep the selected ESP32 board's UART pins and BLE service unchanged.
 Connect receiver TX to ESP32 GNSS RX, receiver RX to ESP32 GNSS TX, and connect both grounds.
 Use 3.3 V UART logic. Check the LC29H(DA) carrier's power ratings and connector labels before connection.

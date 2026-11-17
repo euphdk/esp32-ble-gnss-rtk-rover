@@ -1,6 +1,6 @@
 .PHONY: build test upload monitor
 
-ENV ?= esp32-c3-lc29h-da-oled
+ENV ?= xiao-esp32-c6-lc29h-da-oled
 PORT ?=
 
 build:
